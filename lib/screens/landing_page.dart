@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../constants/colors.dart';
 import 'signup_page.dart';
 import 'website_page.dart';
+import 'technician_login_page.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({Key? key}) : super(key: key);
@@ -67,7 +68,12 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
                   children: [
                     _buildTopButton('User App', true, () {}),
                     const SizedBox(width: 8),
-                    _buildTopButton('Technician App', false, () {}),
+                    _buildTopButton('Technician App', false, () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const TechnicianLoginPage()),
+                      );
+                    }),
                     const SizedBox(width: 8),
                     _buildTopButton('Website', false, () {
                       Navigator.push(

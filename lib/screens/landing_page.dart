@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../constants/colors.dart';
 import 'signup_page.dart';
+import 'website_page.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({Key? key}) : super(key: key);
@@ -64,17 +65,22 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildTopButton('User App', true),
+                    _buildTopButton('User App', true, () {}),
                     const SizedBox(width: 8),
-                    _buildTopButton('Technician App', false),
+                    _buildTopButton('Technician App', false, () {}),
                     const SizedBox(width: 8),
-                    _buildTopButton('Website', false),
+                    _buildTopButton('Website', false, () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const WebsitePage()),
+                      );
+                    }),
                   ],
                 ),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: _buildTopButton('Admin Panel', false),
+                child: _buildTopButton('Admin Panel', false, () {}),
               ),
               
               const Spacer(),
@@ -198,19 +204,22 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildTopButton(String text, bool isActive) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      decoration: BoxDecoration(
-        color: isActive ? AppColors.primary : Colors.white.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 14,
-          fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+  Widget _buildTopButton(String text, bool isActive, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary : Colors.white.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+          ),
         ),
       ),
     );

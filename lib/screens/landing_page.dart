@@ -3,6 +3,7 @@ import '../constants/colors.dart';
 import 'signup_page.dart';
 import 'website_page.dart';
 import 'technician_login_page.dart';
+import 'admin_login_page.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({Key? key}) : super(key: key);
@@ -86,7 +87,12 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: _buildTopButton('Admin Panel', false, () {}),
+                child: _buildTopButton('Admin Panel', false, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AdminLoginPage()),
+                  );
+                }),
               ),
               
               const Spacer(),

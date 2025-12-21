@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+
 import 'providers/auth_provider.dart';
 import 'screens/landing_page.dart';
 import 'screens/home/home_page.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
   runApp(const BharatDoorstepApp());
 }
 
@@ -43,9 +47,11 @@ class AuthChecker extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        
+
         final authProvider = Provider.of<AuthProvider>(context);
-        return authProvider.isLoggedIn ? const HomePage() : const LandingPage();
+        return authProvider.isLoggedIn
+            ? const HomePage()
+            : const LandingPage();
       },
     );
   }

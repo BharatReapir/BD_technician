@@ -17,6 +17,7 @@ class SupportPage extends StatelessWidget {
         ),
       ),
       body: SingleChildScrollView(
+        
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

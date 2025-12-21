@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../constants/colors.dart';
-import '../providers/auth_provider.dart';
-import '../models/user_model.dart';
 import 'home/home_page.dart';
+
+
 
 class OTPVerificationPage extends StatefulWidget {
   final String name;
@@ -29,6 +29,8 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
   final TextEditingController _loginMobileController = TextEditingController();
   final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  String? _verificationId;
   int _resendTimer = 59;
   bool _isVerifying = false;
   bool _isLoading = false;
@@ -59,7 +61,9 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
   }
 
   Future<void> _sendOTP() async {
-    if (_loginMobileController.text.isEmpty || _loginMobileController.text.length != 10) {
+    final phone = _loginMobileController.text.trim();
+
+    if (phone.length != 10) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a valid 10-digit mobile number')),
       );
@@ -68,54 +72,68 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
 
     setState(() => _isLoading = true);
 
-    // TODO: Add actual OTP sending API call here
-    await Future.delayed(const Duration(seconds: 1));
-
-    setState(() {
-      _isLoading = false;
-      _showOTPScreen = true;
-      _currentMobileNumber = _loginMobileController.text;
-      _resendTimer = 59;
-    });
-    
-    _startTimer();
+    await _auth.verifyPhoneNumber(
+      phoneNumber: '+91$phone',
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        await _auth.signInWithCredential(credential);
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message ?? 'OTP verification failed')),
+        );
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        setState(() {
+          _verificationId = verificationId;
+          _isLoading = false;
+          _showOTPScreen = true;
+          _currentMobileNumber = phone;
+          _resendTimer = 59;
+        });
+        _startTimer();
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        _verificationId = verificationId;
+      },
+    );
   }
 
   Future<void> _verifyOTP() async {
-    String otp = _otpControllers.map((c) => c.text).join();
-    
-    if (otp.length != 6) {
+    final otp = _otpControllers.map((c) => c.text).join();
+
+    if (otp.length != 6 || _verificationId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter complete OTP')),
+        const SnackBar(content: Text('Invalid OTP')),
       );
       return;
     }
 
     setState(() => _isVerifying = true);
 
-    // TODO: Add actual OTP verification API call here
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId!,
+        smsCode: otp,
+      );
 
-    // Create user model
-    final user = UserModel(
-      name: _isLoginMode ? 'User' : widget.name,
-      phone: _isLoginMode ? _currentMobileNumber : widget.mobileNumber,
-      email: _isLoginMode ? '' : widget.email,
-      city: _isLoginMode ? '' : widget.city,
-      referralCode: _isLoginMode ? null : widget.referralCode,
-    );
+      await _auth.signInWithCredential(credential);
 
-    // Save user using provider
-    await Provider.of<AuthProvider>(context, listen: false).saveUser(user);
+      if (!mounted) return;
 
-    setState(() => _isVerifying = false);
+      setState(() => _isVerifying = false);
 
-    // Navigate to home
-    if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-        (route) => false,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+        (_) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      
+      setState(() => _isVerifying = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Wrong OTP')),
       );
     }
   }

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import '../constants/colors.dart';
 import 'signup_page.dart';
-import 'website_page.dart';
 import 'technician_login_page.dart';
-import 'admin_login_page.dart';
 
 class LandingPage extends StatefulWidget {
   const LandingPage({Key? key}) : super(key: key);
@@ -12,7 +10,8 @@ class LandingPage extends StatefulWidget {
   State<LandingPage> createState() => _LandingPageState();
 }
 
-class _LandingPageState extends State<LandingPage> with SingleTickerProviderStateMixin {
+class _LandingPageState extends State<LandingPage>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -24,16 +23,18 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeIn),
     );
-    
+
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-    
+    ).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+
     _controller.forward();
   }
 
@@ -61,7 +62,6 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
         child: SafeArea(
           child: Column(
             children: [
-              // Top Navigation Buttons
               Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Row(
@@ -72,39 +72,24 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
                     _buildTopButton('Technician App', false, () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const TechnicianLoginPage()),
-                      );
-                    }),
-                    const SizedBox(width: 8),
-                    _buildTopButton('Website', false, () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const WebsitePage()),
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const TechnicianLoginPage(),
+                        ),
                       );
                     }),
                   ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                child: _buildTopButton('Admin Panel', false, () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AdminLoginPage()),
-                  );
-                }),
-              ),
-              
+
               const Spacer(),
-              
-              // Logo and Title Section
+
               FadeTransition(
                 opacity: _fadeAnimation,
                 child: SlideTransition(
                   position: _slideAnimation,
                   child: Column(
                     children: [
-                      // Logo
                       Container(
                         width: 140,
                         height: 140,
@@ -151,8 +136,6 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
                         ),
                       ),
                       const SizedBox(height: 30),
-                      
-                      // Title
                       const Text(
                         'Bharat Doorstep',
                         style: TextStyle(
@@ -162,8 +145,6 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
                         ),
                       ),
                       const SizedBox(height: 10),
-                      
-                      // Tagline
                       const Text(
                         'Fast. Trusted. Doorstep Repairs.',
                         style: TextStyle(
@@ -175,10 +156,9 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
                   ),
                 ),
               ),
-              
+
               const Spacer(),
-              
-              // Get Started Button
+
               Padding(
                 padding: const EdgeInsets.all(24.0),
                 child: SizedBox(
@@ -188,7 +168,9 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const SignUpPage()),
+                        MaterialPageRoute(
+                          builder: (context) => const SignUpPage(),
+                        ),
                       );
                     },
                     style: ElevatedButton.styleFrom(
@@ -216,13 +198,16 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildTopButton(String text, bool isActive, VoidCallback onTap) {
+  Widget _buildTopButton(
+      String text, bool isActive, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.primary : Colors.white.withOpacity(0.3),
+          color:
+              isActive ? AppColors.primary : Colors.white.withOpacity(0.3),
           borderRadius: BorderRadius.circular(24),
         ),
         child: Text(
@@ -230,7 +215,8 @@ class _LandingPageState extends State<LandingPage> with SingleTickerProviderStat
           style: TextStyle(
             color: Colors.white,
             fontSize: 14,
-            fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            fontWeight:
+                isActive ? FontWeight.bold : FontWeight.normal,
           ),
         ),
       ),

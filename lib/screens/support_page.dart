@@ -129,7 +129,6 @@ class SupportPage extends StatelessWidget {
               ),
             ),
 
-            // Help Topics Grid
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GridView.count(

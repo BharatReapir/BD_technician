@@ -1,24 +1,32 @@
-class UserModel {
+class TechnicianModel {
   final String uid;
   final String name;
   final String phone;
   final String email;
   final String city;
-  final String? referralCode;
-  final String role; // 'user' or 'technician'
+  final List<String> specializations; // ['AC Repair', 'TV Repair', etc.]
+  final bool isOnline;
+  final double rating;
+  final int totalJobs;
+  final double monthlyEarnings;
   final String? profileImage;
+  final String? address;
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  UserModel({
+  TechnicianModel({
     required this.uid,
     required this.name,
     required this.phone,
     required this.email,
     required this.city,
-    this.referralCode,
-    this.role = 'user',
+    required this.specializations,
+    this.isOnline = false,
+    this.rating = 0.0,
+    this.totalJobs = 0,
+    this.monthlyEarnings = 0.0,
     this.profileImage,
+    this.address,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now(),
@@ -30,22 +38,31 @@ class UserModel {
         'phone': phone,
         'email': email,
         'city': city,
-        'referralCode': referralCode,
-        'role': role,
+        'specializations': specializations,
+        'isOnline': isOnline,
+        'rating': rating,
+        'totalJobs': totalJobs,
+        'monthlyEarnings': monthlyEarnings,
         'profileImage': profileImage,
+        'address': address,
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
       };
 
-  factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
+  factory TechnicianModel.fromJson(Map<String, dynamic> json) =>
+      TechnicianModel(
         uid: json['uid'] ?? '',
         name: json['name'] ?? '',
         phone: json['phone'] ?? '',
         email: json['email'] ?? '',
         city: json['city'] ?? '',
-        referralCode: json['referralCode'],
-        role: json['role'] ?? 'user',
+        specializations: List<String>.from(json['specializations'] ?? []),
+        isOnline: json['isOnline'] ?? false,
+        rating: (json['rating'] ?? 0.0).toDouble(),
+        totalJobs: json['totalJobs'] ?? 0,
+        monthlyEarnings: (json['monthlyEarnings'] ?? 0.0).toDouble(),
         profileImage: json['profileImage'],
+        address: json['address'],
         createdAt: json['createdAt'] != null
             ? DateTime.parse(json['createdAt'])
             : DateTime.now(),
@@ -54,27 +71,35 @@ class UserModel {
             : DateTime.now(),
       );
 
-  UserModel copyWith({
+  TechnicianModel copyWith({
     String? uid,
     String? name,
     String? phone,
     String? email,
     String? city,
-    String? referralCode,
-    String? role,
+    List<String>? specializations,
+    bool? isOnline,
+    double? rating,
+    int? totalJobs,
+    double? monthlyEarnings,
     String? profileImage,
+    String? address,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
-    return UserModel(
+    return TechnicianModel(
       uid: uid ?? this.uid,
       name: name ?? this.name,
       phone: phone ?? this.phone,
       email: email ?? this.email,
       city: city ?? this.city,
-      referralCode: referralCode ?? this.referralCode,
-      role: role ?? this.role,
+      specializations: specializations ?? this.specializations,
+      isOnline: isOnline ?? this.isOnline,
+      rating: rating ?? this.rating,
+      totalJobs: totalJobs ?? this.totalJobs,
+      monthlyEarnings: monthlyEarnings ?? this.monthlyEarnings,
       profileImage: profileImage ?? this.profileImage,
+      address: address ?? this.address,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

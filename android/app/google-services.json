@@ -1,13 +1,14 @@
 {
   "project_info": {
-    "project_number": "1003333153894",
-    "project_id": "bharat-doorstep",
-    "storage_bucket": "bharat-doorstep.firebasestorage.app"
+    "project_number": "402582001978",
+    "firebase_url": "https://bharat-doorstep-native-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "bharat-doorstep-native",
+    "storage_bucket": "bharat-doorstep-native.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1003333153894:android:c34e545deee7bc8943a9a7",
+        "mobilesdk_app_id": "1:402582001978:android:15d263e51ee79e5f221803",
         "android_client_info": {
           "package_name": "com.example.bharatapp"
         }
@@ -15,7 +16,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBHND26ZfjGa9nQp7czp2B2PsvP2eziDzM"
+          "current_key": "AIzaSyDyYG4JXt2rYPpycGKso1-Ew0ST9HY6oaw"
         }
       ],
       "services": {

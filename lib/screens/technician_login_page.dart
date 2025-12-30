@@ -13,6 +13,7 @@ class TechnicianLoginPage extends StatefulWidget {
 class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
   final _phoneController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -20,8 +21,21 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
     super.dispose();
   }
 
-  void _getOTP() {
+  Future<void> _getOTP() async {
     if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // Simulate API call delay
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+      });
+
       // Navigate to OTP page
       Navigator.push(
         context,
@@ -155,23 +169,37 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: _getOTP,
+                      onPressed: _isLoading ? null : _getOTP,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0D47A1),
                         foregroundColor: Colors.white,
+                        disabledBackgroundColor: const Color(0xFF0D47A1).withOpacity(0.6),
+                        disabledForegroundColor: Colors.white70,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(50),
-                          side: const BorderSide(color: Colors.white, width: 2),
+                          side: BorderSide(
+                            color: _isLoading ? Colors.white54 : Colors.white,
+                            width: 2,
+                          ),
                         ),
                         elevation: 0,
                       ),
-                      child: const Text(
-                        'Get OTP',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text(
+                              'Get OTP',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                     ),
                   ),
                 ],

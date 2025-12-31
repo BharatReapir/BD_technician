@@ -11,6 +11,14 @@ class BookingModel {
   final String scheduledTime;
   final String? address;
   final String? notes;
+  
+  // Location fields
+  final double? latitude;
+  final double? longitude;
+  final String? area;
+  final String? city;
+  final String? pincode;
+  
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -27,6 +35,11 @@ class BookingModel {
     required this.scheduledTime,
     this.address,
     this.notes,
+    this.latitude,
+    this.longitude,
+    this.area,
+    this.city,
+    this.pincode,
     DateTime? createdAt,
     DateTime? updatedAt,
   })  : createdAt = createdAt ?? DateTime.now(),
@@ -45,6 +58,11 @@ class BookingModel {
         'scheduledTime': scheduledTime,
         'address': address,
         'notes': notes,
+        'latitude': latitude,
+        'longitude': longitude,
+        'area': area,
+        'city': city,
+        'pincode': pincode,
         'createdAt': createdAt.toIso8601String(),
         'updatedAt': updatedAt.toIso8601String(),
       };
@@ -62,6 +80,11 @@ class BookingModel {
         scheduledTime: json['scheduledTime'] ?? '',
         address: json['address'],
         notes: json['notes'],
+        latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
+        longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
+        area: json['area'],
+        city: json['city'],
+        pincode: json['pincode'],
         createdAt: json['createdAt'] != null
             ? DateTime.parse(json['createdAt'])
             : DateTime.now(),
@@ -83,6 +106,11 @@ class BookingModel {
     String? scheduledTime,
     String? address,
     String? notes,
+    double? latitude,
+    double? longitude,
+    String? area,
+    String? city,
+    String? pincode,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -99,6 +127,11 @@ class BookingModel {
       scheduledTime: scheduledTime ?? this.scheduledTime,
       address: address ?? this.address,
       notes: notes ?? this.notes,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      area: area ?? this.area,
+      city: city ?? this.city,
+      pincode: pincode ?? this.pincode,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

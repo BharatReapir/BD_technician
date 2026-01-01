@@ -22,7 +22,15 @@ class PaymentPage extends StatefulWidget {
 
 class _PaymentPageState extends State<PaymentPage> {
   int selectedPaymentMethod = 0;
+  String? selectedBank;
+  String? selectedWallet;
   final TextEditingController upiController = TextEditingController();
+
+  // Card details controllers
+  final TextEditingController cardNumberController = TextEditingController();
+  final TextEditingController cardHolderController = TextEditingController();
+  final TextEditingController expiryController = TextEditingController();
+  final TextEditingController cvvController = TextEditingController();
 
   final List<Map<String, dynamic>> paymentMethods = [
     {'name': 'UPI', 'icon': Icons.smartphone},
@@ -32,7 +40,74 @@ class _PaymentPageState extends State<PaymentPage> {
     {'name': 'Pay After Service', 'icon': Icons.payments},
   ];
 
+  final List<Map<String, String>> banks = [
+    {'name': 'State Bank of India', 'code': 'SBI'},
+    {'name': 'HDFC Bank', 'code': 'HDFC'},
+    {'name': 'ICICI Bank', 'code': 'ICICI'},
+    {'name': 'Axis Bank', 'code': 'AXIS'},
+    {'name': 'Kotak Mahindra Bank', 'code': 'KOTAK'},
+    {'name': 'Punjab National Bank', 'code': 'PNB'},
+    {'name': 'Bank of Baroda', 'code': 'BOB'},
+    {'name': 'Canara Bank', 'code': 'CANARA'},
+  ];
+
+  final List<Map<String, String>> wallets = [
+    {'name': 'Paytm', 'logo': '💳'},
+    {'name': 'PhonePe', 'logo': '📱'},
+    {'name': 'Google Pay', 'logo': 'G'},
+    {'name': 'Amazon Pay', 'logo': 'A'},
+    {'name': 'Mobikwik', 'logo': '💰'},
+    {'name': 'Freecharge', 'logo': '⚡'},
+  ];
+
   void processPayment() {
+    // Validate based on payment method
+    if (selectedPaymentMethod == 0 && upiController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter UPI ID'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (selectedPaymentMethod == 1) {
+      // Validate card details
+      if (cardNumberController.text.isEmpty ||
+          cardHolderController.text.isEmpty ||
+          expiryController.text.isEmpty ||
+          cvvController.text.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please fill all card details'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
+    if (selectedPaymentMethod == 2 && selectedBank == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a bank'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (selectedPaymentMethod == 3 && selectedWallet == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a wallet'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     // Show loading indicator
     showDialog(
       context: context,
@@ -229,6 +304,313 @@ class _PaymentPageState extends State<PaymentPage> {
                         ],
                       ),
                     ),
+
+                  // Card Details (shown when Credit/Debit Card is selected)
+                  if (selectedPaymentMethod == 1)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Card Number',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: cardNumberController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 16,
+                            decoration: InputDecoration(
+                              hintText: '1234 5678 9012 3456',
+                              counterText: '',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppColors.bgMedium),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppColors.bgMedium),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppColors.primary),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Card Holder Name',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: cardHolderController,
+                            decoration: InputDecoration(
+                              hintText: 'John Doe',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppColors.bgMedium),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppColors.bgMedium),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: const BorderSide(color: AppColors.primary),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Expiry Date',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textDark,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    TextField(
+                                      controller: expiryController,
+                                      keyboardType: TextInputType.number,
+                                      decoration: InputDecoration(
+                                        hintText: 'MM/YY',
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                          borderSide: const BorderSide(color: AppColors.bgMedium),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                          borderSide: const BorderSide(color: AppColors.bgMedium),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                          borderSide: const BorderSide(color: AppColors.primary),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'CVV',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textDark,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    TextField(
+                                      controller: cvvController,
+                                      keyboardType: TextInputType.number,
+                                      maxLength: 3,
+                                      obscureText: true,
+                                      decoration: InputDecoration(
+                                        hintText: '123',
+                                        counterText: '',
+                                        border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                          borderSide: const BorderSide(color: AppColors.bgMedium),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                          borderSide: const BorderSide(color: AppColors.bgMedium),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(8),
+                                          borderSide: const BorderSide(color: AppColors.primary),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Net Banking (shown when Net Banking is selected)
+                  if (selectedPaymentMethod == 2)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Select Your Bank',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ...banks.map((bank) {
+                            final isSelected = selectedBank == bank['code'];
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedBank = bank['code'];
+                                });
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppColors.primary.withOpacity(0.1)
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.bgMedium,
+                                    width: isSelected ? 2 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 40,
+                                      height: 40,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.bgLight,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(
+                                        Icons.account_balance,
+                                        color: AppColors.primary,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        bank['name']!,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: isSelected
+                                              ? AppColors.primary
+                                              : AppColors.textDark,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isSelected)
+                                      const Icon(
+                                        Icons.check_circle,
+                                        color: AppColors.primary,
+                                        size: 20,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    ),
+
+                  // Wallet (shown when Wallet is selected)
+                  if (selectedPaymentMethod == 3)
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Select Your Wallet',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                              childAspectRatio: 1.2,
+                            ),
+                            itemCount: wallets.length,
+                            itemBuilder: (context, index) {
+                              final wallet = wallets[index];
+                              final isSelected = selectedWallet == wallet['name'];
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    selectedWallet = wallet['name'];
+                                  });
+                                },
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppColors.primary.withOpacity(0.1)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? AppColors.primary
+                                          : AppColors.bgMedium,
+                                      width: isSelected ? 2 : 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        wallet['logo']!,
+                                        style: const TextStyle(fontSize: 32),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        wallet['name']!,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: isSelected
+                                              ? AppColors.primary
+                                              : AppColors.textDark,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                   
                   const SizedBox(height: 100),
                 ],
@@ -265,15 +647,17 @@ class _PaymentPageState extends State<PaymentPage> {
                   processPayment();
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: selectedPaymentMethod == 4 
+                      ? Colors.green 
+                      : AppColors.primary,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Pay Now',
-                  style: TextStyle(
+                child: Text(
+                  selectedPaymentMethod == 4 ? 'Pay Later' : 'Pay Now',
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
@@ -290,6 +674,10 @@ class _PaymentPageState extends State<PaymentPage> {
   @override
   void dispose() {
     upiController.dispose();
+    cardNumberController.dispose();
+    cardHolderController.dispose();
+    expiryController.dispose();
+    cvvController.dispose();
     super.dispose();
   }
 }

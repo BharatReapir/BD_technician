@@ -7,6 +7,7 @@ import '../bookings_page.dart';
 import '../wallet_page.dart';
 import '../support_page.dart';
 import '../profile_page.dart';
+import 'service_category_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -78,6 +79,18 @@ class _HomePageState extends State<HomePage> {
 
 class HomeContent extends StatelessWidget {
   const HomeContent({Key? key}) : super(key: key);
+
+  void _navigateToService(BuildContext context, String serviceType, IconData icon) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ServiceCategoryPage(
+          serviceType: serviceType,
+          icon: icon,
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -254,15 +267,36 @@ class HomeContent extends StatelessWidget {
                 physics: const NeverScrollableScrollPhysics(),
                 mainAxisSpacing: 16,
                 crossAxisSpacing: 16,
-                children: const [
-                  ServiceCard(icon: Icons.ac_unit, title: 'AC Repair', bgColor: AppColors.serviceBg1),
-                  ServiceCard(icon: Icons.tv, title: 'TV Repair', bgColor: AppColors.serviceBg2),
-                  ServiceCard(icon: Icons.kitchen, title: 'Refrigerator', bgColor: AppColors.serviceBg3),
-                  ServiceCard(icon: Icons.local_laundry_service, title: 'Washing Machine', bgColor: AppColors.serviceBg2),
-                  ServiceCard(icon: Icons.bolt, title: 'Electrician', bgColor: AppColors.serviceBg3),
-                  ServiceCard(icon: Icons.build, title: 'Plumber', bgColor: AppColors.serviceBg1),
-                  ServiceCard(icon: Icons.cleaning_services, title: 'Cleaning', bgColor: AppColors.serviceBg2),
-                  ServiceCard(icon: Icons.more_horiz, title: 'More', bgColor: AppColors.serviceBg3),
+                children: [
+                  GestureDetector(
+                    onTap: () => _navigateToService(context, 'AC Repair', Icons.ac_unit),
+                    child: const ServiceCard(icon: Icons.ac_unit, title: 'AC Repair', bgColor: AppColors.serviceBg1),
+                  ),
+                  GestureDetector(
+                    onTap: () => _navigateToService(context, 'TV Repair', Icons.tv),
+                    child: const ServiceCard(icon: Icons.tv, title: 'TV Repair', bgColor: AppColors.serviceBg2),
+                  ),
+                  GestureDetector(
+                    onTap: () => _navigateToService(context, 'Refrigerator', Icons.kitchen),
+                    child: const ServiceCard(icon: Icons.kitchen, title: 'Refrigerator', bgColor: AppColors.serviceBg3),
+                  ),
+                  GestureDetector(
+                    onTap: () => _navigateToService(context, 'Washing Machine', Icons.local_laundry_service),
+                    child: const ServiceCard(icon: Icons.local_laundry_service, title: 'Washing Machine', bgColor: AppColors.serviceBg2),
+                  ),
+                  GestureDetector(
+                    onTap: () => _navigateToService(context, 'Electrician', Icons.bolt),
+                    child: const ServiceCard(icon: Icons.bolt, title: 'Electrician', bgColor: AppColors.serviceBg3),
+                  ),
+                  GestureDetector(
+                    onTap: () => _navigateToService(context, 'Plumber', Icons.build),
+                    child: const ServiceCard(icon: Icons.build, title: 'Plumber', bgColor: AppColors.serviceBg1),
+                  ),
+                  GestureDetector(
+                    onTap: () => _navigateToService(context, 'Cleaning', Icons.cleaning_services),
+                    child: const ServiceCard(icon: Icons.cleaning_services, title: 'Cleaning', bgColor: AppColors.serviceBg2),
+                  ),
+                  const ServiceCard(icon: Icons.more_horiz, title: 'More', bgColor: AppColors.serviceBg3),
                 ],
               ),
             ),

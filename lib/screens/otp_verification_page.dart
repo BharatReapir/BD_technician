@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../constants/colors.dart';
+import '../services/firebase_service.dart';
+import '../models/user_model.dart';
 import 'home/home_page.dart';
-
-
 
 class OTPVerificationPage extends StatefulWidget {
   final String name;
@@ -46,6 +46,8 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
       _showOTPScreen = true;
       _currentMobileNumber = widget.mobileNumber;
       _startTimer();
+      // Auto-send OTP for signup flow
+      _sendOTPForSignup();
     }
   }
 
@@ -58,6 +60,34 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
         _startTimer();
       }
     });
+  }
+
+  Future<void> _sendOTPForSignup() async {
+    setState(() => _isLoading = true);
+
+    await _auth.verifyPhoneNumber(
+      phoneNumber: '+91${widget.mobileNumber}',
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        await _auth.signInWithCredential(credential);
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.message ?? 'OTP verification failed')),
+          );
+        }
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        setState(() {
+          _verificationId = verificationId;
+          _isLoading = false;
+        });
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        _verificationId = verificationId;
+      },
+    );
   }
 
   Future<void> _sendOTP() async {
@@ -79,9 +109,11 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
       },
       verificationFailed: (FirebaseAuthException e) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message ?? 'OTP verification failed')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.message ?? 'OTP verification failed')),
+          );
+        }
       },
       codeSent: (String verificationId, int? resendToken) {
         setState(() {
@@ -117,12 +149,40 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
         smsCode: otp,
       );
 
+      // Sign in with credential
       await _auth.signInWithCredential(credential);
 
       if (!mounted) return;
 
+      // ========== 🔥 THIS IS THE CRITICAL PART 🔥 ==========
+      // Save user data to Firestore ONLY during signup
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user != null && !_isLoginMode) {
+        // Create UserModel from signup data
+        final userModel = UserModel(
+          uid: user.uid,
+          name: widget.name,
+          mobile: widget.mobileNumber,
+          email: widget.email,
+          city: widget.city,
+          referralCode: widget.referralCode,
+          role: 'customer',
+          createdAt: DateTime.now(),
+        );
+
+        // Save to Firestore
+        await FirebaseService.saveUser(userModel);
+
+        print('✅ User saved to Firestore: ${user.uid}');
+      } else if (user != null && _isLoginMode) {
+        print('✅ User logged in: ${user.uid}');
+      }
+      // ================================================
+
       setState(() => _isVerifying = false);
 
+      // Navigate to home page
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomePage()),
@@ -133,7 +193,7 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
       
       setState(() => _isVerifying = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Wrong OTP')),
+        SnackBar(content: Text('Verification failed: ${e.toString()}')),
       );
     }
   }
@@ -354,6 +414,11 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
                     onPressed: () {
                       setState(() => _resendTimer = 59);
                       _startTimer();
+                      if (_isLoginMode) {
+                        _sendOTP();
+                      } else {
+                        _sendOTPForSignup();
+                      }
                     },
                     child: const Text(
                       'Resend OTP',

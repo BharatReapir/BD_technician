@@ -169,7 +169,6 @@ class AuthProvider extends ChangeNotifier {
       name: updates['name'] ?? _user!.name,
       email: updates['email'] ?? _user!.email,
       city: updates['city'] ?? _user!.city,
-      profileImage: updates['profileImage'] ?? _user!.profileImage,
     );
 
     // Update cache

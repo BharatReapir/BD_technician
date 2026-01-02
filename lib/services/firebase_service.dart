@@ -3,6 +3,7 @@ import '../models/user_model.dart';
 import '../models/technician_model.dart';
 import '../models/booking_model.dart';
 
+
 class FirebaseService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
 

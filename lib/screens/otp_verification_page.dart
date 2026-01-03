@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import '../constants/colors.dart';
 import '../services/firebase_service.dart';
 import '../models/user_model.dart';
+import '../providers/auth_provider.dart' as auth_provider;
 import 'home/home_page.dart';
 
 class OTPVerificationPage extends StatefulWidget {
@@ -155,28 +157,31 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
       if (!mounted) return;
 
       // ========== 🔥 THIS IS THE CRITICAL PART 🔥 ==========
-      // Save user data to Firestore ONLY during signup
+      final authProvider = Provider.of<auth_provider.AuthProvider>(context, listen: false);
       final user = FirebaseAuth.instance.currentUser;
 
-      if (user != null && !_isLoginMode) {
-        // Create UserModel from signup data
-        final userModel = UserModel(
-          uid: user.uid,
-          name: widget.name,
-          mobile: widget.mobileNumber,
-          email: widget.email,
-          city: widget.city,
-          referralCode: widget.referralCode,
-          role: 'customer',
-          createdAt: DateTime.now(),
-        );
+      if (user != null) {
+        if (!_isLoginMode) {
+          // Signup flow: Create and save new user
+          final userModel = UserModel(
+            uid: user.uid,
+            name: widget.name,
+            mobile: widget.mobileNumber,
+            email: widget.email,
+            city: widget.city,
+            referralCode: widget.referralCode,
+            role: 'customer',
+            createdAt: DateTime.now(),
+          );
 
-        // Save to Firestore
-        await FirebaseService.saveUser(userModel);
-
-        print('✅ User saved to Firestore: ${user.uid}');
-      } else if (user != null && _isLoginMode) {
-        print('✅ User logged in: ${user.uid}');
+          // Save to AuthProvider (which handles Firestore and cache)
+          await authProvider.saveUser(userModel);
+          print('✅ User saved to Firestore: ${user.uid}');
+        } else {
+          // Login flow: Load existing user data
+          await authProvider.loadUser();
+          print('✅ User logged in and profile loaded: ${user.uid}');
+        }
       }
       // ================================================
 

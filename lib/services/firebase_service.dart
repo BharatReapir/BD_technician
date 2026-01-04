@@ -7,7 +7,10 @@ import '../models/booking_model.dart';
 
 class FirebaseService {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
-  static final FirebaseDatabase _realtimeDb = FirebaseDatabase.instance;
+  static final FirebaseDatabase _realtimeDb = FirebaseDatabase.instanceFor(
+    app: Firebase.app(),
+    databaseURL: 'https://bharat-doorstep-native-default-rtdb.asia-southeast1.firebasedatabase.app/',
+  );
 
   // ========== USER OPERATIONS ==========
 

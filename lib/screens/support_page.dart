@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/colors.dart';
+import 'ai_chat_page.dart'; // ADD THIS IMPORT
 
 class SupportPage extends StatelessWidget {
   const SupportPage({Key? key}) : super(key: key);
@@ -17,7 +18,6 @@ class SupportPage extends StatelessWidget {
         ),
       ),
       body: SingleChildScrollView(
-        
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -55,17 +55,29 @@ class SupportPage extends StatelessWidget {
                     children: [
                       Expanded(
                         child: _buildContactButton(
+                          context,
                           Icons.call,
                           'Call Us',
-                          () {},
+                          () {
+                            // Add phone call functionality here
+                          },
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildContactButton(
-                          Icons.chat,
-                          'Live Chat',
-                          () {},
+                          context,
+                          Icons.smart_toy, // Changed to AI icon
+                          'AI Chat',
+                          () {
+                            // Navigate to AI Chat Page
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AIChatPage(),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ],
@@ -184,7 +196,8 @@ class SupportPage extends StatelessWidget {
     );
   }
 
-  Widget _buildContactButton(IconData icon, String label, VoidCallback onTap) {
+  Widget _buildContactButton(
+      BuildContext context, IconData icon, String label, VoidCallback onTap) {
     return ElevatedButton.icon(
       onPressed: onTap,
       style: ElevatedButton.styleFrom(

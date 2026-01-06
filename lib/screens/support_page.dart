@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/colors.dart';
-import 'ai_chat_page.dart'; // ADD THIS IMPORT
+import 'simple_qa_chat_page.dart'; // Change to simple Q&A chat
 
 class SupportPage extends StatelessWidget {
   const SupportPage({Key? key}) : super(key: key);
@@ -67,14 +67,14 @@ class SupportPage extends StatelessWidget {
                       Expanded(
                         child: _buildContactButton(
                           context,
-                          Icons.smart_toy, // Changed to AI icon
-                          'AI Chat',
+                          Icons.question_answer,
+                          'Q&A Chat',
                           () {
-                            // Navigate to AI Chat Page
+                            // Navigate to Q&A Chat Page
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const AIChatPage(),
+                                builder: (context) => const QAChatPage(),
                               ),
                             );
                           },

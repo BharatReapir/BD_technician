@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../constants/colors.dart';
-import 'dart:math';
+import '../home/home_page.dart';
 
 class BookingSuccessPage extends StatelessWidget {
   final String serviceName;
   final double amount;
   final String date;
   final String timeSlot;
+  final String bookingId;
 
   const BookingSuccessPage({
     Key? key,
@@ -14,221 +16,218 @@ class BookingSuccessPage extends StatelessWidget {
     required this.amount,
     required this.date,
     required this.timeSlot,
+    required this.bookingId,
   }) : super(key: key);
-
-  String _generateBookingId() {
-    final random = Random();
-    final id = random.nextInt(9999999) + 1000000;
-    return '#BD$id';
-  }
 
   @override
   Widget build(BuildContext context) {
-    final bookingId = _generateBookingId();
-    
     return Scaffold(
-      backgroundColor: AppColors.bgLight,
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Success Icon
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check,
-                      size: 64,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Success Message
-                  const Text(
-                    'Payment Successful!',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Your booking has been confirmed',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.textGray,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  // Booking Details Card
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Success Icon
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_circle,
+                  color: Colors.green,
+                  size: 80,
+                ),
+              ),
+              
+              const SizedBox(height: 32),
+              
+              const Text(
+                'Booking Confirmed!',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textDark,
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              const Text(
+                'Your service has been booked successfully',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textGray,
+                ),
+              ),
+              
+              const SizedBox(height: 40),
+              
+              // Booking Details Card
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.bgLight,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.bgMedium),
+                ),
+                child: Column(
+                  children: [
+                    _buildDetailRow('Service', serviceName),
+                    const Divider(height: 24),
+                    _buildDetailRow('Date & Time', '$date • ${timeSlot.split(' - ')[0]}'),
+                    const Divider(height: 24),
+                    _buildDetailRow('Amount Paid', '₹${amount.toStringAsFixed(0)}'),
+                    const Divider(height: 24),
+                    
+                    // Booking ID with copy button
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Booking ID
-                        Center(
-                          child: Column(
-                            children: [
-                              const Text(
-                                'Booking ID',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.textGray,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                bookingId,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ],
+                        const Text(
+                          'Booking ID',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textGray,
                           ),
                         ),
-                        const SizedBox(height: 24),
-                        const Divider(),
-                        const SizedBox(height: 16),
-                        
-                        // Service Details
-                        _buildDetailRow('Service', serviceName),
-                        _buildDetailRow('Date & Time', '$date • ${timeSlot.split(' - ')[0]}'),
-                        _buildDetailRow('Amount Paid', '₹${amount.toStringAsFixed(0)}'),
-                        _buildDetailRow('Payment Mode', 'UPI'),
-                        
-                        const SizedBox(height: 16),
-                        const Divider(),
-                        const SizedBox(height: 16),
-                        
-                        // Info Message
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.bgLight,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: const [
-                              Icon(
-                                Icons.info_outline,
-                                color: AppColors.primary,
-                                size: 20,
+                        Row(
+                          children: [
+                            Text(
+                              bookingId.substring(0, 8).toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textDark,
+                                fontFamily: 'monospace',
                               ),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  "A technician will be assigned shortly. You'll receive a notification once confirmed.",
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: AppColors.textGray,
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: bookingId));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Booking ID copied!'),
+                                    duration: Duration(seconds: 1),
+                                    backgroundColor: Colors.green,
                                   ),
-                                ),
+                                );
+                              },
+                              child: const Icon(
+                                Icons.copy,
+                                size: 18,
+                                color: AppColors.primary,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  // Action Buttons
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 32),
+              
+              // Info Message
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(
+                      Icons.info_outline,
+                      color: AppColors.primary,
+                      size: 24,
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'A technician will be assigned soon. You\'ll receive updates on your phone.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textDark,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const Spacer(),
+              
+              // Buttons
+              Column(
+                children: [
                   SizedBox(
                     width: double.infinity,
+                    height: 56,
                     child: ElevatedButton(
                       onPressed: () {
-                        // Navigate to booking details page
-                        // For now, we'll just show a message
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('View Booking functionality coming soon'),
-                          ),
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const HomePage()),
+                          (route) => false,
                         );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                         ),
+                        elevation: 0,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.calendar_today, color: Colors.white, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'View Booking',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
+                      child: const Text(
+                        'Go to Home',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
+                    height: 56,
                     child: OutlinedButton(
                       onPressed: () {
-                        // Navigate back to home
-                        Navigator.of(context).popUntil((route) => route.isFirst);
+                        // Navigate to bookings page
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(builder: (_) => const HomePage()),
+                          (route) => false,
+                        );
                       },
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primary),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        side: const BorderSide(color: AppColors.primary, width: 2),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.home, color: AppColors.primary, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Go Home',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
+                      child: const Text(
+                        'View My Bookings',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -236,29 +235,26 @@ class BookingSuccessPage extends StatelessWidget {
   }
 
   Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              color: AppColors.textGray,
-            ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            color: AppColors.textGray,
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textDark,
-            ),
-            textAlign: TextAlign.right,
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textDark,
           ),
-        ],
-      ),
+          textAlign: TextAlign.right,
+        ),
+      ],
     );
   }
 }

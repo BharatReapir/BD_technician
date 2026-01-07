@@ -267,12 +267,6 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           'Total Amount',
                           '₹${getTotalAmount().toStringAsFixed(0)}',
                           isTotal: true,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildPriceRow(
-                          'Total',
-                          '₹${getTotalAmount().toStringAsFixed(0)}',
-                          isTotal: true,
                           color: AppColors.primary,
                         ),
                       ],
@@ -308,6 +302,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         totalAmount: getTotalAmount(),
                         date: widget.date,
                         timeSlot: widget.timeSlot,
+                        address: widget.address, // ADDED THIS LINE
                       ),
                     ),
                   );

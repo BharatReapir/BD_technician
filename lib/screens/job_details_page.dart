@@ -1,3 +1,4 @@
+import 'package:bharatapp/models/booking_model.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../constants/colors.dart';
@@ -18,7 +19,7 @@ class JobDetailsPage extends StatelessWidget {
     required this.earnings,
     required this.time,
     this.latitude,
-    this.longitude,
+    this.longitude, required BookingModel booking,
   }) : super(key: key);
 
   Future<void> _launchMaps(BuildContext context) async {

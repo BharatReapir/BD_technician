@@ -178,6 +178,21 @@ class FirebaseService {
     }
   }
 
+  /// Update technician wallet balance
+  static Future<void> updateTechnicianWallet(String uid, double newBalance) async {
+    try {
+      print('💰 Updating wallet for technician: $uid to ₹$newBalance');
+      await _realtimeDb.ref('technicians/$uid').update({
+        'walletBalance': newBalance,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      print('✅ Wallet updated successfully');
+    } catch (e) {
+      print('Error updating technician wallet: $e');
+      rethrow;
+    }
+  }
+
   /// Get all online technicians by city
   static Future<List<TechnicianModel>> getOnlineTechnicians(String city) async {
     try {

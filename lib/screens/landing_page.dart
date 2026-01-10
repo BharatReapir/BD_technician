@@ -74,7 +74,7 @@ class _LandingPageState extends State<LandingPage>
                         context,
                         MaterialPageRoute(
                           builder: (context) =>
-                              const TechnicianLoginPage(),
+                              const TechnicianHomePage(),
                         ),
                       );
                     }),

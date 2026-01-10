@@ -39,8 +39,8 @@ class _TechnicianWalletPageState extends State<TechnicianWalletPage> {
       // Update wallet in Firebase
       await FirebaseService.updateTechnicianWallet(currentTech.uid, newBalance);
 
-      // Update local state
-      await authProvider.loadUser();
+      // 🔥 IMPORTANT: Reload data from Firebase
+      await authProvider.reloadData();
 
       if (!mounted) return;
 
@@ -148,7 +148,72 @@ class _TechnicianWalletPageState extends State<TechnicianWalletPage> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<auth_provider.AuthProvider>(context);
     final technician = authProvider.technician;
-    final currentBalance = technician?.walletBalance ?? 0;
+
+    // Show loading state
+    if (authProvider.isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Text(
+            'Wallet',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
+    // Show error if no technician
+    if (technician == null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Text(
+            'Wallet',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 80, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text(
+                'Not logged in as technician',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text('Please log in with a technician account'),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                ),
+                child: const Text('Go Back', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final currentBalance = technician.walletBalance;
 
     return Scaffold(
       backgroundColor: Colors.white,

@@ -42,19 +42,24 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
         return;
       }
 
+      debugPrint('👤 Current user ID: ${currentUser.uid}');
       debugPrint('📥 Loading bookings for user: ${currentUser.uid}');
       
       // Get bookings from Firebase
       final bookings = await FirebaseService.getUserBookings(currentUser.uid);
       
       debugPrint('✅ Loaded ${bookings.length} bookings');
+      for (var booking in bookings) {
+        debugPrint('  - ${booking.service} | ${booking.status} | ${booking.scheduledTime}');
+      }
       
       setState(() {
         _allBookings = bookings;
         _isLoading = false;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('❌ Error loading bookings: $e');
+      debugPrint('Stack trace: $stackTrace');
       setState(() {
         _isLoading = false;
       });
@@ -64,6 +69,11 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
           SnackBar(
             content: Text('Failed to load bookings: $e'),
             backgroundColor: Colors.red,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _loadBookings,
+            ),
           ),
         );
       }

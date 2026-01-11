@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../constants/colors.dart';
 
 class WalletPage extends StatelessWidget {
-  const WalletPage({Key? key}) : super(key: key);
+  const WalletPage({Key? key, required String technicianId}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {

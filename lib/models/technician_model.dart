@@ -7,9 +7,8 @@ class TechnicianModel {
   final List<String> specializations;
   final bool isOnline;
   final int totalJobs;
-  final double monthlyEarnings;
   final double rating;
-  final double walletBalance; // NEW FIELD
+  final double walletBalance;
   final String? profileImage;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -23,9 +22,8 @@ class TechnicianModel {
     required this.specializations,
     this.isOnline = false,
     this.totalJobs = 0,
-    this.monthlyEarnings = 0.0,
     this.rating = 0.0,
-    this.walletBalance = 0.0, // NEW FIELD
+    this.walletBalance = 0.0,
     this.profileImage,
     required this.createdAt,
     this.updatedAt,
@@ -41,9 +39,8 @@ class TechnicianModel {
       'specializations': specializations,
       'isOnline': isOnline,
       'totalJobs': totalJobs,
-      'monthlyEarnings': monthlyEarnings,
       'rating': rating,
-      'walletBalance': walletBalance, // NEW FIELD
+      'walletBalance': walletBalance,
       'profileImage': profileImage,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
@@ -60,9 +57,8 @@ class TechnicianModel {
       specializations: List<String>.from(json['specializations'] ?? []),
       isOnline: json['isOnline'] ?? false,
       totalJobs: json['totalJobs'] ?? 0,
-      monthlyEarnings: (json['monthlyEarnings'] ?? 0.0).toDouble(),
       rating: (json['rating'] ?? 0.0).toDouble(),
-      walletBalance: (json['walletBalance'] ?? 0.0).toDouble(), // NEW FIELD
+      walletBalance: (json['walletBalance'] ?? 0.0).toDouble(),
       profileImage: json['profileImage'],
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'])
@@ -82,9 +78,8 @@ class TechnicianModel {
     List<String>? specializations,
     bool? isOnline,
     int? totalJobs,
-    double? monthlyEarnings,
     double? rating,
-    double? walletBalance, // NEW FIELD
+    double? walletBalance,
     String? profileImage,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -98,9 +93,8 @@ class TechnicianModel {
       specializations: specializations ?? this.specializations,
       isOnline: isOnline ?? this.isOnline,
       totalJobs: totalJobs ?? this.totalJobs,
-      monthlyEarnings: monthlyEarnings ?? this.monthlyEarnings,
       rating: rating ?? this.rating,
-      walletBalance: walletBalance ?? this.walletBalance, // NEW FIELD
+      walletBalance: walletBalance ?? this.walletBalance,
       profileImage: profileImage ?? this.profileImage,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

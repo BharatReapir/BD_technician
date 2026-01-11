@@ -25,7 +25,7 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: Colors.white,
       body: _selectedIndex == 0 ? const HomeContent() : 
              _selectedIndex == 1 ? const BookingsPage() :
-             _selectedIndex == 2 ? const WalletPage() :
+             _selectedIndex == 2 ? const WalletPage(technicianId: '',) :
              _selectedIndex == 3 ? const SupportPage() :
              const ProfilePage(),
       bottomNavigationBar: Container(

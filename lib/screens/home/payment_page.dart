@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../constants/colors.dart';
 import '../../models/booking_model.dart';
 import '../../services/firebase_service.dart';
@@ -39,6 +40,10 @@ class _PaymentPageState extends State<PaymentPage> {
   final TextEditingController expiryController = TextEditingController();
   final TextEditingController cvvController = TextEditingController();
 
+  // Razorpay instance
+  late Razorpay _razorpay;
+  String? _currentBookingId;
+
   final List<Map<String, dynamic>> paymentMethods = [
     {'name': 'UPI', 'icon': Icons.smartphone},
     {'name': 'Credit/Debit Card', 'icon': Icons.credit_card},
@@ -67,8 +72,225 @@ class _PaymentPageState extends State<PaymentPage> {
     {'name': 'Freecharge', 'logo': '⚡'},
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    upiController.dispose();
+    cardNumberController.dispose();
+    cardHolderController.dispose();
+    expiryController.dispose();
+    cvvController.dispose();
+    super.dispose();
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    debugPrint('✅ Payment Success: ${response.paymentId}');
+    debugPrint('Order ID: ${response.orderId}');
+    debugPrint('Signature: ${response.signature}');
+
+    // Update booking status to confirmed
+    if (_currentBookingId != null) {
+      _updateBookingAfterPayment(_currentBookingId!, 'confirmed', response.paymentId);
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment Successful! ID: ${response.paymentId}'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    // Navigate to success page
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BookingSuccessPage(
+          serviceName: widget.serviceName,
+          amount: widget.totalAmount,
+          date: widget.date,
+          timeSlot: widget.timeSlot,
+          bookingId: _currentBookingId ?? '',
+        ),
+      ),
+    );
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    debugPrint('❌ Payment Error: ${response.code} - ${response.message}');
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment Failed: ${response.message}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+
+    // Mark booking as payment failed
+    if (_currentBookingId != null) {
+      FirebaseService.updateBookingStatus(_currentBookingId!, 'payment_failed');
+    }
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    debugPrint('External Wallet: ${response.walletName}');
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('External Wallet: ${response.walletName}'),
+      ),
+    );
+  }
+
+  Future<void> _updateBookingAfterPayment(String bookingId, String status, String? paymentId) async {
+    try {
+      await FirebaseService.updateBookingStatus(bookingId, status);
+      if (paymentId != null) {
+        await FirebaseService.updateBookingPaymentId(bookingId, paymentId);
+      }
+    } catch (e) {
+      debugPrint('Error updating booking: $e');
+    }
+  }
+
+  Future<void> _openRazorpayCheckout() async {
+    try {
+      final authProvider = Provider.of<auth_provider.AuthProvider>(context, listen: false);
+      final currentUser = authProvider.user;
+
+      if (currentUser == null) {
+        throw Exception('User not logged in');
+      }
+
+      // Create booking first
+      final bookingId = await _createBooking('pending');
+      _currentBookingId = bookingId;
+
+      var options = {
+        'key': 'YOUR_RAZORPAY_KEY_ID', // Replace with your key
+        'amount': (widget.totalAmount * 100).toInt(), // Amount in paise
+        'name': 'Service Booking',
+        'description': widget.serviceName,
+        'order_id': bookingId, // Optional: generate from backend
+        'prefill': {
+          'contact': currentUser.mobile,
+          'email': currentUser.email ?? '',
+          'name': currentUser.name,
+        },
+        'theme': {
+          'color': '#FF6B6B',
+        },
+        'timeout': 300,
+        'retry': {
+          'enabled': true,
+          'max_count': 3,
+        },
+      };
+
+      // Set payment method preference
+      if (selectedPaymentMethod == 0) {
+        options['method'] = 'upi';
+      } else if (selectedPaymentMethod == 1) {
+        options['method'] = 'card';
+      } else if (selectedPaymentMethod == 2) {
+        options['method'] = 'netbanking';
+      } else if (selectedPaymentMethod == 3) {
+        options['method'] = 'wallet';
+      }
+
+      _razorpay.open(options);
+    } catch (e) {
+      debugPrint('Error opening Razorpay: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<String> _createBooking(String status) async {
+    final authProvider = Provider.of<auth_provider.AuthProvider>(context, listen: false);
+    final currentUser = authProvider.user;
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null || firebaseUser == null) {
+      throw Exception('User not logged in');
+    }
+
+    final booking = BookingModel(
+      id: '',
+      userId: currentUser.uid,
+      userName: currentUser.name,
+      userPhone: currentUser.mobile,
+      service: widget.serviceName,
+      status: status,
+      earnings: widget.totalAmount,
+      scheduledTime: '${widget.date} ${widget.timeSlot}',
+      address: '${widget.address['address']}, ${widget.address['city']}',
+      notes: 'Payment method: ${paymentMethods[selectedPaymentMethod]['name']}',
+      city: widget.address['city'],
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+
+    return await FirebaseService.createBooking(booking);
+  }
+
   Future<void> processPayment() async {
-    // Validate based on payment method
+    // For Pay After Service
+    if (selectedPaymentMethod == 4) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+
+      try {
+        final bookingId = await _createBooking('pending');
+        await Future.delayed(const Duration(seconds: 1));
+
+        if (!mounted) return;
+        Navigator.pop(context);
+        
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BookingSuccessPage(
+              serviceName: widget.serviceName,
+              amount: widget.totalAmount,
+              date: widget.date,
+              timeSlot: widget.timeSlot,
+              bookingId: bookingId,
+            ),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        Navigator.pop(context);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Booking failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Validate based on payment method for online payments
     if (selectedPaymentMethod == 0 && upiController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -114,87 +336,8 @@ class _PaymentPageState extends State<PaymentPage> {
       return;
     }
 
-    // Show loading indicator
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(
-          color: AppColors.primary,
-        ),
-      ),
-    );
-
-    try {
-      // Get current user
-      final authProvider = Provider.of<auth_provider.AuthProvider>(context, listen: false);
-      final currentUser = authProvider.user;
-      final firebaseUser = FirebaseAuth.instance.currentUser;
-
-      if (currentUser == null || firebaseUser == null) {
-        throw Exception('User not logged in');
-      }
-
-      debugPrint('💾 Creating booking for user: ${currentUser.uid}');
-
-      // Create booking model
-      final booking = BookingModel(
-        id: '', // Will be generated by Firebase
-        userId: currentUser.uid,
-        userName: currentUser.name,
-        userPhone: currentUser.mobile,
-        service: widget.serviceName,
-        status: 'pending',
-        earnings: widget.totalAmount,
-        scheduledTime: '${widget.date} ${widget.timeSlot}',
-        address: '${widget.address['address']}, ${widget.address['city']}',
-        notes: 'Payment method: ${paymentMethods[selectedPaymentMethod]['name']}',
-        city: widget.address['city'],
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-      );
-
-      debugPrint('📝 Booking details: ${booking.toJson()}');
-
-      // Save booking to Firebase Realtime Database
-      final bookingId = await FirebaseService.createBooking(booking);
-      
-      debugPrint('✅ Booking saved with ID: $bookingId');
-
-      // Simulate payment processing
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (!mounted) return;
-      
-      Navigator.pop(context); // Close loading dialog
-      
-      // Navigate to success page
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => BookingSuccessPage(
-            serviceName: widget.serviceName,
-            amount: widget.totalAmount,
-            date: widget.date,
-            timeSlot: widget.timeSlot,
-            bookingId: bookingId,
-          ),
-        ),
-      );
-    } catch (e) {
-      debugPrint('❌ Error creating booking: $e');
-      
-      if (!mounted) return;
-      
-      Navigator.pop(context); // Close loading dialog
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Booking failed: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+    // Open Razorpay for online payment
+    _openRazorpayCheckout();
   }
 
   @override
@@ -717,15 +860,5 @@ class _PaymentPageState extends State<PaymentPage> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    upiController.dispose();
-    cardNumberController.dispose();
-    cardHolderController.dispose();
-    expiryController.dispose();
-    cvvController.dispose();
-    super.dispose();
   }
 }

@@ -289,8 +289,25 @@ class FirebaseService {
         'status': status,
         'updatedAt': DateTime.now().toIso8601String(),
       });
+      print('✅ Booking status updated: $bookingId -> $status');
     } catch (e) {
       print('Error updating booking status: $e');
+      rethrow;
+    }
+  }
+
+  /// Update booking payment details
+  static Future<void> updateBookingPaymentId(
+      String bookingId, String paymentId) async {
+    try {
+      await _realtimeDb.ref('bookings/$bookingId').update({
+        'paymentId': paymentId,
+        'paymentStatus': 'completed',
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      print('✅ Payment ID updated: $bookingId -> $paymentId');
+    } catch (e) {
+      print('Error updating payment ID: $e');
       rethrow;
     }
   }

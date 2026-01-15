@@ -12,7 +12,6 @@ class FirebaseService {
   static FirebaseDatabase get _realtimeDb {
     if (_realtimeDbInstance == null) {
       try {
-        // Get the databaseURL from firebase_options.dart based on platform
         String? databaseURL;
         
         if (kIsWeb) {
@@ -119,14 +118,14 @@ class FirebaseService {
   /// Create or update technician
   static Future<void> saveTechnician(TechnicianModel technician) async {
     try {
-      print('Saving technician: ${technician.uid}');
+      print('💾 Saving technician: ${technician.uid}');
       final techJson = technician.toJson();
-      print('Technician data: $techJson');
+      print('🔧 Technician data: $techJson');
       
       await _realtimeDb.ref('technicians/${technician.uid}').set(techJson);
-      print('Technician saved successfully to Realtime Database');
+      print('✅ Technician saved successfully to Realtime Database');
     } catch (e) {
-      print('Error saving technician: $e');
+      print('❌ Error saving technician: $e');
       rethrow;
     }
   }
@@ -134,13 +133,19 @@ class FirebaseService {
   /// Get technician by ID
   static Future<TechnicianModel?> getTechnician(String uid) async {
     try {
+      print('🔍 Fetching technician: $uid');
       final snapshot = await _realtimeDb.ref('technicians/$uid').get();
+      
       if (snapshot.exists && snapshot.value != null) {
-        return TechnicianModel.fromJson(Map<String, dynamic>.from(snapshot.value as Map));
+        print('✅ Technician found: $uid');
+        final techData = Map<String, dynamic>.from(snapshot.value as Map);
+        return TechnicianModel.fromJson(techData);
       }
+      
+      print('❌ Technician not found: $uid');
       return null;
     } catch (e) {
-      print('Error getting technician: $e');
+      print('❌ Error getting technician: $e');
       return null;
     }
   }
@@ -148,12 +153,14 @@ class FirebaseService {
   /// Update technician status (online/offline)
   static Future<void> updateTechnicianStatus(String uid, bool isOnline) async {
     try {
+      print('🔄 Updating technician status: $uid -> ${isOnline ? "ONLINE" : "OFFLINE"}');
       await _realtimeDb.ref('technicians/$uid').update({
         'isOnline': isOnline,
         'updatedAt': DateTime.now().toIso8601String(),
       });
+      print('✅ Technician status updated successfully');
     } catch (e) {
-      print('Error updating technician status: $e');
+      print('❌ Error updating technician status: $e');
       rethrow;
     }
   }
@@ -172,8 +179,9 @@ class FirebaseService {
         'rating': rating,
         'updatedAt': DateTime.now().toIso8601String(),
       });
+      print('✅ Technician stats updated: $uid');
     } catch (e) {
-      print('Error updating technician stats: $e');
+      print('❌ Error updating technician stats: $e');
       rethrow;
     }
   }
@@ -188,7 +196,7 @@ class FirebaseService {
       });
       print('✅ Wallet updated successfully');
     } catch (e) {
-      print('Error updating technician wallet: $e');
+      print('❌ Error updating technician wallet: $e');
       rethrow;
     }
   }
@@ -241,6 +249,18 @@ class FirebaseService {
             .toList();
       }
       return [];
+    });
+  }
+
+  /// Stream single technician data (real-time updates)
+  static Stream<TechnicianModel?> streamTechnician(String uid) {
+    return _realtimeDb.ref('technicians/$uid').onValue.map((event) {
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        return TechnicianModel.fromJson(
+          Map<String, dynamic>.from(event.snapshot.value as Map)
+        );
+      }
+      return null;
     });
   }
 

@@ -1,133 +1,127 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import '../models/wallet_transaction_model.dart';
 
 class WalletService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final DatabaseReference _db = FirebaseDatabase.instance.ref();
+
   static const double BOOKING_DEDUCTION = 200.0;
 
+  /// ✅ FAKE: Deduct ₹200 when job accepted
   Future<bool> deductBookingAmount(String technicianId, String jobId) async {
     try {
-      DocumentReference techRef =
-          _firestore.collection('technicians').doc(technicianId);
+      final techRef = _db.child('technicians').child(technicianId);
 
-      return await _firestore.runTransaction((transaction) async {
-        DocumentSnapshot techSnapshot = await transaction.get(techRef);
+      final snapshot = await techRef.child('walletBalance').get();
+      double currentBalance = 0.0;
 
-        if (!techSnapshot.exists) {
-          throw Exception('Technician not found');
-        }
+      if (snapshot.exists) {
+        currentBalance = (snapshot.value as num).toDouble();
+      }
 
-        double currentBalance =
-            (techSnapshot.data() as Map<String, dynamic>)['walletBalance'] ??
-                0.0;
+      if (currentBalance < BOOKING_DEDUCTION) {
+        throw Exception('Insufficient balance');
+      }
 
-        if (currentBalance < BOOKING_DEDUCTION) {
-          throw Exception('Insufficient balance');
-        }
+      final newBalance = currentBalance - BOOKING_DEDUCTION;
 
-        double newBalance = currentBalance - BOOKING_DEDUCTION;
+      print('🔥 NEW WALLET SERVICE CALLED');
 
-        transaction.update(techRef, {
-          'walletBalance': newBalance,
-          'updatedAt': DateTime.now().toIso8601String(),
-        });
-
-        DocumentReference transactionRef =
-            _firestore.collection('wallet_transactions').doc();
-
-        WalletTransaction walletTransaction = WalletTransaction(
-          id: transactionRef.id,
-          technicianId: technicianId,
-          amount: BOOKING_DEDUCTION,
-          type: 'debit',
-          description: 'Booking acceptance charge',
-          balanceAfter: newBalance,
-          timestamp: DateTime.now(),
-          jobId: jobId,
-        );
-
-        transaction.set(transactionRef, walletTransaction.toJson());
-
-        return true;
+      await techRef.update({
+        'walletBalance': newBalance,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
       });
+
+      // Save transaction
+      await _db.child('wallet_transactions').push().set({
+        'technicianId': technicianId,
+        'amount': BOOKING_DEDUCTION,
+        'type': 'debit',
+        'description': 'Booking acceptance charge',
+        'balanceAfter': newBalance,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'jobId': jobId,
+      });
+
+      return true;
     } catch (e) {
-      print('Error deducting amount: $e');
+      print('❌ Error deducting amount: $e');
       return false;
     }
   }
 
+  /// ✅ FAKE: Recharge wallet instantly
   Future<bool> rechargeWallet(String technicianId, double amount) async {
     try {
-      DocumentReference techRef =
-          _firestore.collection('technicians').doc(technicianId);
+      final techRef = _db.child('technicians').child(technicianId);
 
-      return await _firestore.runTransaction((transaction) async {
-        DocumentSnapshot techSnapshot = await transaction.get(techRef);
+      final snapshot = await techRef.child('walletBalance').get();
+      double currentBalance = 0.0;
 
-        if (!techSnapshot.exists) {
-          throw Exception('Technician not found');
-        }
+      if (snapshot.exists) {
+        currentBalance = (snapshot.value as num).toDouble();
+      }
 
-        double currentBalance =
-            (techSnapshot.data() as Map<String, dynamic>)['walletBalance'] ??
-                0.0;
-        double newBalance = currentBalance + amount;
+      final newBalance = currentBalance + amount;
 
-        transaction.update(techRef, {
-          'walletBalance': newBalance,
-          'updatedAt': DateTime.now().toIso8601String(),
-        });
-
-        DocumentReference transactionRef =
-            _firestore.collection('wallet_transactions').doc();
-
-        WalletTransaction walletTransaction = WalletTransaction(
-          id: transactionRef.id,
-          technicianId: technicianId,
-          amount: amount,
-          type: 'credit',
-          description: 'Wallet recharge',
-          balanceAfter: newBalance,
-          timestamp: DateTime.now(),
-        );
-
-        transaction.set(transactionRef, walletTransaction.toJson());
-
-        return true;
+      await techRef.update({
+        'walletBalance': newBalance,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
       });
+
+      // Save transaction
+      await _db.child('wallet_transactions').push().set({
+        'technicianId': technicianId,
+        'amount': amount,
+        'type': 'credit',
+        'description': 'Wallet recharge',
+        'balanceAfter': newBalance,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+
+      return true;
     } catch (e) {
-      print('Error recharging wallet: $e');
+      print('❌ Error recharging wallet: $e');
       return false;
     }
   }
 
+  /// ✅ Transaction history
   Stream<List<WalletTransaction>> getTransactionHistory(String technicianId) {
-    return _firestore
-        .collection('wallet_transactions')
-        .where('technicianId', isEqualTo: technicianId)
-        .orderBy('timestamp', descending: true)
-        .limit(50)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs
-          .map((doc) =>
-              WalletTransaction.fromJson(doc.data() as Map<String, dynamic>))
-          .toList();
+    return _db
+        .child('wallet_transactions')
+        .orderByChild('technicianId')
+        .equalTo(technicianId)
+        .onValue
+        .map((event) {
+      if (!event.snapshot.exists || event.snapshot.value == null) {
+        return [];
+      }
+
+      final data = Map<String, dynamic>.from(event.snapshot.value as Map);
+
+      return data.values
+          .map((e) => WalletTransaction.fromJson(
+                Map<String, dynamic>.from(e),
+              ))
+          .toList()
+        ..sort(
+          (a, b) => b.timestamp.compareTo(a.timestamp),
+        );
     });
   }
 
+  /// ✅ Get wallet balance
   Future<double> getWalletBalance(String technicianId) async {
     try {
-      DocumentSnapshot doc =
-          await _firestore.collection('technicians').doc(technicianId).get();
+      final snapshot =
+          await _db.child('technicians').child(technicianId).child('walletBalance').get();
 
-      if (doc.exists) {
-        return ((doc.data() as Map<String, dynamic>)['walletBalance'] ?? 0.0)
-            .toDouble();
+      if (snapshot.exists) {
+        return (snapshot.value as num).toDouble();
       }
       return 0.0;
     } catch (e) {
-      print('Error getting wallet balance: $e');
+      print('❌ Error getting wallet balance: $e');
       return 0.0;
     }
   }

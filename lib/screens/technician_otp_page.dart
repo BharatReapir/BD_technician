@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../services/technician_auth_service.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/auth_provider.dart';
+import '../models/technician_model.dart';
+import 'technician_registration_page.dart';
 import 'technician_home_page.dart';
 
 class TechnicianOTPPage extends StatefulWidget {
@@ -17,7 +21,6 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
   final List<TextEditingController> _otpControllers =
       List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
-  final TechnicianAuthService _authService = TechnicianAuthService();
   bool _isLoading = false;
 
   @override
@@ -50,21 +53,99 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
     });
 
     try {
-      await _authService.verifyOTP(otp);
+      final authProvider = context.read<AuthProvider>();
 
+      // 1. ✅ Verify OTP using AuthProvider
+      final userCredential = await authProvider.verifyOTP(otp);
+      final uid = userCredential.user!.uid;
+      debugPrint('✅ OTP Verified for UID: $uid');
+
+      // 2. ✅ CONFIRM USER TYPE
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('userType', 'technician');
+      debugPrint('🔧 User type confirmed: technician');
+
+      // 3. ✅ Check if technician profile exists in Realtime Database
+      TechnicianModel? technician = await authProvider.getTechnicianData(uid);
+
+      if (technician != null) {
+        // ✅ EXISTING TECHNICIAN - Profile found
+        debugPrint('✅ Technician found: ${technician.name}');
+        debugPrint('💰 Wallet Balance: ₹${technician.walletBalance}');
+        
+        // Save technician data to AuthProvider
+        await authProvider.saveTechnician(technician);
+        debugPrint('💾 Technician saved to AuthProvider');
+        
+        // Navigate to technician home
+        if (mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const TechnicianHomePage(),
+            ),
+            (route) => false,
+          );
+        }
+      } else {
+        // ⚠️ NEW TECHNICIAN - Profile not found, navigate to registration
+        debugPrint('⚠️ New technician detected - redirecting to registration');
+        
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => TechnicianRegistrationPage(
+                uid: uid,
+                phoneNumber: widget.phoneNumber,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ OTP Verification Error: $e');
       if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const TechnicianHomePage(),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Invalid OTP: ${e.toString()}'),
+            backgroundColor: Colors.red,
           ),
-          (route) => false,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _resendOTP() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final authProvider = context.read<AuthProvider>();
+      await authProvider.sendOTP(widget.phoneNumber);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('OTP sent successfully!'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Invalid OTP: $e')),
+          SnackBar(
+            content: Text('Error resending OTP: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -203,6 +284,18 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        TextButton(
+                          onPressed: _isLoading ? null : _resendOTP,
+                          child: const Text(
+                            'Resend OTP',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
                         ),
                       ],

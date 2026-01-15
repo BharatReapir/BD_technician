@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import '../services/technician_auth_service.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import '../services/wallet_service.dart';
 import '../models/technician_model.dart';
 import 'tech_wallet_page.dart';
+import 'job_details_page.dart'; // Add this import
 
 class TechnicianHomePage extends StatefulWidget {
   const TechnicianHomePage({Key? key}) : super(key: key);
@@ -13,193 +14,198 @@ class TechnicianHomePage extends StatefulWidget {
 }
 
 class _TechnicianHomePageState extends State<TechnicianHomePage> {
-  final TechnicianAuthService _authService = TechnicianAuthService();
   final WalletService _walletService = WalletService();
 
   @override
   Widget build(BuildContext context) {
-    User? user = _authService.getCurrentUser();
-
-    if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('User not logged in')),
-      );
-    }
-
-    return StreamBuilder<TechnicianModel?>(
-      stream: _authService.technicianStream(user.uid),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        // ✅ Check if user is logged in
+        if (!authProvider.isLoggedIn || !authProvider.isTechnician) {
           return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+            body: Center(child: Text('Please login as technician')),
           );
         }
 
-        if (!snapshot.hasData || snapshot.data == null) {
+        // ✅ Get technician from AuthProvider
+        final technician = authProvider.technician;
+
+        if (technician == null) {
           return const Scaffold(
             body: Center(child: Text('No technician data found')),
           );
         }
 
-        TechnicianModel technician = snapshot.data!;
+        // ✅ Stream technician data for real-time updates
+        return StreamBuilder<TechnicianModel?>(
+          stream: authProvider.technicianStream(technician.uid),
+          builder: (context, snapshot) {
+            // Use streamed data if available, otherwise use cached data
+            final currentTechnician = snapshot.data ?? technician;
 
-        return Scaffold(
-          body: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF0047AB),
-                  Color(0xFF0056C8),
-                ],
-              ),
-            ),
-            child: SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+            return Scaffold(
+              body: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xFF0047AB),
+                      Color(0xFF0056C8),
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              'Welcome, ${technician.name.split(' ')[0]}!',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Welcome, ${currentTechnician.name.split(' ')[0]}!',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const Text(
+                                  'Ready to work?',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const Text(
-                              'Ready to work?',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: currentTechnician.isOnline
+                                    ? Colors.green
+                                    : Colors.grey,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                currentTechnician.isOnline ? 'ONLINE' : 'OFFLINE',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Text(
-                            'ONLINE',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => TechWalletPage(
-                                    technicianId: technician.uid,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: _buildStatCard(
-                              '₹${technician.walletBalance.toStringAsFixed(0)}',
-                              'Wallet',
-                              Icons.account_balance_wallet,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatCard(
-                            '${technician.totalJobs}',
-                            'Jobs Done',
-                            Icons.work,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStatCard(
-                            '${technician.rating.toStringAsFixed(1)}',
-                            'Rating',
-                            Icons.star,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Expanded(
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(30),
-                          topRight: Radius.circular(30),
-                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Padding(
-                            padding: EdgeInsets.all(24.0),
-                            child: Text(
-                              "Today's Jobs (3)",
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => TechWalletPage(
+                                        technicianId: currentTechnician.uid,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: _buildStatCard(
+                                  '₹${currentTechnician.walletBalance.toStringAsFixed(0)}',
+                                  'Wallet',
+                                  Icons.account_balance_wallet,
+                                ),
                               ),
                             ),
-                          ),
-                          Expanded(
-                            child: ListView(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
-                              children: [
-                                _buildJobCard(
-                                  context,
-                                  technician,
-                                  'AC Service & Repair',
-                                  'MG Road, Mumbai',
-                                  '09:00 AM - 11:00 AM',
-                                  '₹499',
-                                  'Priya Sharma',
-                                  'AC Repair',
-                                  '₹399',
-                                  'job_001',
-                                ),
-                              ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildStatCard(
+                                '${currentTechnician.totalJobs}',
+                                'Jobs Done',
+                                Icons.work,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildStatCard(
+                                '${currentTechnician.rating.toStringAsFixed(1)}',
+                                'Rating',
+                                Icons.star,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      Expanded(
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.only(
+                              topLeft: Radius.circular(30),
+                              topRight: Radius.circular(30),
                             ),
                           ),
-                        ],
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.all(24.0),
+                                child: Text(
+                                  "Today's Jobs (3)",
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: ListView(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  children: [
+                                    _buildJobCard(
+                                      context,
+                                      currentTechnician,
+                                      'AC Service & Repair',
+                                      'MG Road, Mumbai',
+                                      '09:00 AM - 11:00 AM',
+                                      '₹499',
+                                      'Priya Sharma',
+                                      'AC Repair',
+                                      '₹399',
+                                      'job_001',
+                                      '+91 98765 43210',
+                                      '123, MG Road, Mumbai',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () {},
-            backgroundColor: Colors.black87,
-            child: const Icon(Icons.help_outline, color: Colors.white),
-          ),
+              floatingActionButton: FloatingActionButton(
+                onPressed: () {},
+                backgroundColor: Colors.black87,
+                child: const Icon(Icons.help_outline, color: Colors.white),
+              ),
+            );
+          },
         );
       },
     );
@@ -247,6 +253,8 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     String service,
     String earnings,
     String jobId,
+    String customerPhone,
+    String customerAddress,
   ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -432,20 +440,49 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                           Navigator.pop(context);
 
                           if (success) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'Job accepted! ₹200 deducted from wallet.'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
+                            // ✅ Reload technician data to update wallet balance
+                            await context.read<AuthProvider>().reloadData();
+                            
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Job accepted! ₹200 deducted from wallet.'),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 1),
+                                ),
+                              );
+
+                              // ✅ Navigate to Job Details page after 1 second
+                              await Future.delayed(const Duration(seconds: 1));
+                              
+                              if (mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => JobDetailsPage(
+                                      jobId: jobId,
+                                      customerName: customerName,
+                                      customerPhone: customerPhone,
+                                      customerAddress: customerAddress,
+                                      service: service,
+                                      timeSlot: time,
+                                      earnings: earnings,
+                                      commission: '-₹100 (20%)',
+                                    ),
+                                  ),
+                                );
+                              }
+                            }
                           } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Failed to accept job'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Failed to accept job'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
                           }
                         },
                         style: ElevatedButton.styleFrom(

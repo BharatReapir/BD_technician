@@ -1,292 +1,160 @@
-import 'package:bharatapp/models/booking_model.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../constants/colors.dart';
-import 'job_active_page.dart';
+import 'job_in_progress_page.dart';
 
 class JobDetailsPage extends StatelessWidget {
-  final String customer;
+  final String jobId;
+  final String customerName;
+  final String customerPhone;
+  final String customerAddress;
   final String service;
+  final String timeSlot;
   final String earnings;
-  final String time;
-  final double? latitude;
-  final double? longitude;
+  final String commission;
 
   const JobDetailsPage({
     Key? key,
-    required this.customer,
+    required this.jobId,
+    required this.customerName,
+    required this.customerPhone,
+    required this.customerAddress,
     required this.service,
+    required this.timeSlot,
     required this.earnings,
-    required this.time,
-    this.latitude,
-    this.longitude, required BookingModel booking,
+    required this.commission,
   }) : super(key: key);
-
-  Future<void> _launchMaps(BuildContext context) async {
-    final lat = latitude ?? 19.0760; // Default Mumbai coordinates
-    final lng = longitude ?? 72.8777;
-    
-    // Try different map URLs in order of preference
-    final urls = [
-      'google.navigation:q=$lat,$lng', // Google Maps app
-      'https://www.google.com/maps/search/?api=1&query=$lat,$lng', // Google Maps web
-      'https://maps.google.com/?q=$lat,$lng', // Fallback
-    ];
-
-    bool launched = false;
-    for (final urlString in urls) {
-      try {
-        final uri = Uri.parse(urlString);
-        if (await canLaunchUrl(uri)) {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-          launched = true;
-          break;
-        }
-      } catch (e) {
-        continue;
-      }
-    }
-
-    if (!launched && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open maps. Please install Google Maps.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    final lat = latitude ?? 19.0760;
-    final lng = longitude ?? 72.8777;
-
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0D47A1),
-        title: const Text('Job Details'),
+        backgroundColor: const Color(0xFF0047AB),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Job Details',
+          style: TextStyle(color: Colors.white),
+        ),
         elevation: 0,
       ),
       body: SingleChildScrollView(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Call Customer Button
+            // Customer Information Section
             Container(
-              width: double.infinity,
-              margin: const EdgeInsets.all(24),
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  // Handle call
-                },
-                icon: const Icon(Icons.phone, size: 24),
-                label: const Text(
-                  'Call Customer',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-              ),
-            ),
-            
-            // Service Details Card
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
+              color: Colors.white,
               padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Customer Information',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoRow('Name:', customerName),
+                  const SizedBox(height: 12),
+                  _buildInfoRow('Phone:', customerPhone),
+                  const SizedBox(height: 12),
+                  _buildInfoRow('Address:', customerAddress),
+                  const SizedBox(height: 24),
+                  
+                  // Call Customer Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        // TODO: Implement call functionality
+                      },
+                      icon: const Icon(Icons.phone, color: Colors.white),
+                      label: const Text(
+                        'Call Customer',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
                   ),
                 ],
               ),
+            ),
+
+            const Divider(height: 1, thickness: 1),
+
+            // Service Details Section
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'Service Details',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1A1A1A),
+                      color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  
-                  _buildDetailRow('Service:', service),
                   const SizedBox(height: 16),
-                  _buildDetailRow('Time Slot:', time),
-                  const SizedBox(height: 16),
-                  _buildDetailRow('Your Earnings:', earnings, isHighlight: true),
-                  const SizedBox(height: 16),
-                  _buildDetailRow('Commission:', '-₹100 (20%)', isRed: true),
+                  _buildInfoRow('Service:', service),
+                  const SizedBox(height: 12),
+                  _buildInfoRow('Time Slot:', timeSlot),
+                  const SizedBox(height: 12),
+                  _buildInfoRow('Your Earnings:', earnings, 
+                      valueColor: Colors.green),
+                  const SizedBox(height: 12),
+                  _buildInfoRow('Commission:', commission, 
+                      valueColor: Colors.red),
                 ],
               ),
             ),
+
             const SizedBox(height: 24),
-            
-            // Static Map Preview
-            GestureDetector(
-              onTap: () => _launchMaps(context),
+
+            // Map Section (Placeholder)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 24),
-                height: 250,
+                height: 200,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE3F2FD),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 5),
-                    ),
-                  ],
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey[300]!),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Stack(
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Map illustration with better design
-                      Container(
-                        width: double.infinity,
-                        height: double.infinity,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              const Color(0xFFE3F2FD),
-                              const Color(0xFFBBDEFB),
-                            ],
-                          ),
-                        ),
-                        child: Stack(
-                          children: [
-                            // Grid pattern to simulate map
-                            ...List.generate(5, (i) => Positioned(
-                              left: 0,
-                              right: 0,
-                              top: i * 50.0,
-                              child: Container(
-                                height: 1,
-                                color: const Color(0xFF90CAF9).withOpacity(0.3),
-                              ),
-                            )),
-                            ...List.generate(5, (i) => Positioned(
-                              top: 0,
-                              bottom: 0,
-                              left: i * 75.0,
-                              child: Container(
-                                width: 1,
-                                color: const Color(0xFF90CAF9).withOpacity(0.3),
-                              ),
-                            )),
-                            // Center marker and info
-                            Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF0D47A1),
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFF0D47A1).withOpacity(0.3),
-                                          blurRadius: 20,
-                                          spreadRadius: 5,
-                                        ),
-                                      ],
-                                    ),
-                                    child: const Icon(
-                                      Icons.location_on,
-                                      size: 48,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 20,
-                                      vertical: 10,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.1),
-                                          blurRadius: 10,
-                                        ),
-                                      ],
-                                    ),
-                                    child: Text(
-                                      customer,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF0D47A1),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                      Icon(
+                        Icons.location_on,
+                        size: 48,
+                        color: Colors.blue[700],
                       ),
-                      // Bottom overlay
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [
-                                Colors.black.withOpacity(0.7),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(
-                                Icons.touch_app,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Tap to open in Google Maps',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Customer Location',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey[700],
                         ),
                       ),
                     ],
@@ -294,93 +162,109 @@ class JobDetailsPage extends StatelessWidget {
                 ),
               ),
             ),
+
             const SizedBox(height: 24),
-            
-            // Navigate to Location Button
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              child: OutlinedButton.icon(
-                onPressed: () => _launchMaps(context),
-                icon: const Icon(Icons.navigation, size: 24),
-                label: const Text(
-                  'Navigate to Location',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF0D47A1),
-                  side: const BorderSide(color: Color(0xFF0D47A1), width: 2),
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // Start Job Button
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => JobActivePage(
-                        customer: customer,
-                        service: service,
-                        earnings: earnings,
-                      ),
+
+            // Navigate Button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    // TODO: Implement navigation to maps
+                  },
+                  icon: const Icon(Icons.navigation, color: Colors.white),
+                  label: const Text(
+                    'Navigate to Location',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
                     ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
                   ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  'Start Job',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0047AB),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 0,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 24),
+
+            const SizedBox(height: 16),
+
+            // Start Job Button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => JobInProgressPage(
+                          jobId: jobId,
+                          customerName: customerName,
+                          service: service,
+                          timeSlot: timeSlot,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text(
+                    'Start Job',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 2,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {bool isHighlight = false, bool isRed = false}) {
+  Widget _buildInfoRow(String label, String value, {Color? valueColor}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
           style: const TextStyle(
-            fontSize: 16,
-            color: Color(0xFF666666),
+            fontSize: 15,
+            color: Colors.black54,
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: isHighlight ? 20 : 16,
-            fontWeight: isHighlight ? FontWeight.bold : FontWeight.w600,
-            color: isRed ? Colors.red : (isHighlight ? AppColors.primary : const Color(0xFF1A1A1A)),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: valueColor ?? Colors.black87,
+            ),
           ),
         ),
       ],

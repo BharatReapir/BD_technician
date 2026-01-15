@@ -1,3 +1,21 @@
+// technician_model.dart
+
+DateTime _parseDate(dynamic value) {
+  if (value == null) {
+    return DateTime.now();
+  }
+
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value);
+  }
+
+  if (value is String) {
+    return DateTime.tryParse(value) ?? DateTime.now();
+  }
+
+  return DateTime.now();
+}
+
 class TechnicianModel {
   final String uid;
   final String name;
@@ -57,14 +75,12 @@ class TechnicianModel {
       specializations: List<String>.from(json['specializations'] ?? []),
       isOnline: json['isOnline'] ?? false,
       totalJobs: json['totalJobs'] ?? 0,
-      rating: (json['rating'] ?? 0.0).toDouble(),
-      walletBalance: (json['walletBalance'] ?? 0.0).toDouble(),
+      rating: (json['rating'] ?? 0).toDouble(),
+      walletBalance: (json['walletBalance'] ?? 0).toDouble(),
       profileImage: json['profileImage'],
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
+      createdAt: _parseDate(json['createdAt']),
       updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'])
+          ? _parseDate(json['updatedAt'])
           : null,
     );
   }

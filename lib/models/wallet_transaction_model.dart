@@ -1,3 +1,21 @@
+// wallet_transaction_model.dart
+
+DateTime _parseWalletDate(dynamic value) {
+  if (value == null) {
+    return DateTime.now();
+  }
+
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value);
+  }
+
+  if (value is String) {
+    return DateTime.tryParse(value) ?? DateTime.now();
+  }
+
+  return DateTime.now();
+}
+
 class WalletTransaction {
   final String id;
   final String technicianId;
@@ -36,13 +54,11 @@ class WalletTransaction {
     return WalletTransaction(
       id: json['id'] ?? '',
       technicianId: json['technicianId'] ?? '',
-      amount: (json['amount'] ?? 0.0).toDouble(),
+      amount: (json['amount'] ?? 0).toDouble(),
       type: json['type'] ?? '',
       description: json['description'] ?? '',
-      balanceAfter: (json['balanceAfter'] ?? 0.0).toDouble(),
-      timestamp: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'])
-          : DateTime.now(),
+      balanceAfter: (json['balanceAfter'] ?? 0).toDouble(),
+      timestamp: _parseWalletDate(json['timestamp']),
       jobId: json['jobId'],
     );
   }

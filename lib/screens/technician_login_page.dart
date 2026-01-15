@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../services/technician_auth_service.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../providers/auth_provider.dart';
 import 'technician_otp_page.dart';
 
 class TechnicianLoginPage extends StatefulWidget {
@@ -12,7 +14,6 @@ class TechnicianLoginPage extends StatefulWidget {
 
 class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
   final TextEditingController _phoneController = TextEditingController();
-  final TechnicianAuthService _authService = TechnicianAuthService();
   bool _isLoading = false;
 
   @override
@@ -34,7 +35,14 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
     });
 
     try {
-      await _authService.sendOTP(_phoneController.text);
+      // ✅ SET USER TYPE BEFORE SENDING OTP
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('userType', 'technician');
+      debugPrint('🔧 User type set to: technician');
+
+      // ✅ Use AuthProvider to send OTP
+      final authProvider = context.read<AuthProvider>();
+      await authProvider.sendOTP(_phoneController.text);
 
       if (mounted) {
         Navigator.push(

@@ -161,90 +161,76 @@ class _PaymentPageState extends State<PaymentPage> {
     }
   }
 
-  Future<void> _openRazorpayCheckout() async {
-    try {
-      final authProvider = Provider.of<auth_provider.AuthProvider>(context, listen: false);
-      final currentUser = authProvider.user;
+Future<void> _openRazorpayCheckout() async {
+  try {
+    // 1️⃣ Create booking FIRST
+    final bookingId = await _createBooking('pending');
+    _currentBookingId = bookingId;
 
-      if (currentUser == null) {
-        throw Exception('User not logged in');
-      }
+    final firebaseUser = FirebaseAuth.instance.currentUser!;
+    final userData =
+        context.read<auth_provider.AuthProvider>().user ??
+        await FirebaseService.getUser(firebaseUser.uid);
 
-      // Create booking first
-      final bookingId = await _createBooking('pending');
-      _currentBookingId = bookingId;
+    var options = {
+      'key': 'YOUR_RAZORPAY_KEY_ID',
+      'amount': (widget.totalAmount * 100).toInt(),
+      'name': 'Bharat Doorstep',
+      'description': widget.serviceName,
+      'prefill': {
+        'contact': userData?.mobile ?? '',
+        'email': userData?.email ?? '',
+        'name': userData?.name ?? '',
+      },
+      'theme': {'color': '#00A86B'},
+    };
 
-      var options = {
-        'key': 'YOUR_RAZORPAY_KEY_ID', // Replace with your key
-        'amount': (widget.totalAmount * 100).toInt(), // Amount in paise
-        'name': 'Service Booking',
-        'description': widget.serviceName,
-        'order_id': bookingId, // Optional: generate from backend
-        'prefill': {
-          'contact': currentUser.mobile,
-          'email': currentUser.email ?? '',
-          'name': currentUser.name,
-        },
-        'theme': {
-          'color': '#FF6B6B',
-        },
-        'timeout': 300,
-        'retry': {
-          'enabled': true,
-          'max_count': 3,
-        },
-      };
-
-      // Set payment method preference
-      if (selectedPaymentMethod == 0) {
-        options['method'] = 'upi';
-      } else if (selectedPaymentMethod == 1) {
-        options['method'] = 'card';
-      } else if (selectedPaymentMethod == 2) {
-        options['method'] = 'netbanking';
-      } else if (selectedPaymentMethod == 3) {
-        options['method'] = 'wallet';
-      }
-
-      _razorpay.open(options);
-    } catch (e) {
-      debugPrint('Error opening Razorpay: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<String> _createBooking(String status) async {
-    final authProvider = Provider.of<auth_provider.AuthProvider>(context, listen: false);
-    final currentUser = authProvider.user;
-    final firebaseUser = FirebaseAuth.instance.currentUser;
-
-    if (currentUser == null || firebaseUser == null) {
-      throw Exception('User not logged in');
-    }
-
-    final booking = BookingModel(
-      id: '',
-      userId: currentUser.uid,
-      userName: currentUser.name,
-      userPhone: currentUser.mobile,
-      service: widget.serviceName,
-      status: status,
-      earnings: widget.totalAmount,
-      scheduledTime: '${widget.date} ${widget.timeSlot}',
-      address: '${widget.address['address']}, ${widget.address['city']}',
-      notes: 'Payment method: ${paymentMethods[selectedPaymentMethod]['name']}',
-      city: widget.address['city'],
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+    _razorpay.open(options);
+  } catch (e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment error: $e'),
+        backgroundColor: Colors.red,
+      ),
     );
-
-    return await FirebaseService.createBooking(booking);
   }
+}
+
+ Future<String> _createBooking(String status) async {
+  // 🔐 AUTH: ONLY trust FirebaseAuth
+  final firebaseUser = FirebaseAuth.instance.currentUser;
+
+  if (firebaseUser == null) {
+    throw Exception('User not logged in');
+  }
+
+  // 👤 Get user profile (Provider OR DB fallback)
+  final authProv = context.read<auth_provider.AuthProvider>();
+  final userData =
+      authProv.user ?? await FirebaseService.getUser(firebaseUser.uid);
+
+  if (userData == null) {
+    throw Exception('User profile not found');
+  }
+
+  final booking = BookingModel(
+    id: '',
+    userId: firebaseUser.uid,
+    userName: userData.name,
+    userPhone: userData.mobile,
+    service: widget.serviceName,
+    status: status, // pending / confirmed
+    earnings: widget.totalAmount,
+    scheduledTime: '${widget.date} ${widget.timeSlot}',
+    address: '${widget.address['address']}, ${widget.address['city']}',
+    city: widget.address['city'],
+    notes: 'Payment method: ${paymentMethods[selectedPaymentMethod]['name']}',
+    createdAt: DateTime.now(),
+    updatedAt: DateTime.now(),
+  );
+
+  return await FirebaseService.createBooking(booking);
+}
 
   Future<void> processPayment() async {
     // For Pay After Service

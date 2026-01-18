@@ -7,6 +7,8 @@ class ServiceDetailsPage extends StatelessWidget {
   final String price;
   final double rating;
   final int reviews;
+  final int basePrice;
+  final String? priceType;
 
   const ServiceDetailsPage({
     Key? key,
@@ -14,6 +16,8 @@ class ServiceDetailsPage extends StatelessWidget {
     required this.price,
     required this.rating,
     required this.reviews,
+    required this.basePrice,
+    this.priceType,
   }) : super(key: key);
 
   @override
@@ -82,7 +86,7 @@ class ServiceDetailsPage extends StatelessWidget {
                             const Icon(Icons.star, color: Colors.amber, size: 18),
                             const SizedBox(width: 4),
                             Text(
-                              '$rating',
+                              rating.toStringAsFixed(1),
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
@@ -101,7 +105,7 @@ class ServiceDetailsPage extends StatelessWidget {
                             const Icon(Icons.access_time, size: 16, color: AppColors.textGray),
                             const SizedBox(width: 4),
                             const Text(
-                              '45 mins',
+                              '45-60 mins',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textGray,
@@ -111,32 +115,58 @@ class ServiceDetailsPage extends StatelessWidget {
                         ),
                         const SizedBox(height: 24),
                         
-                        // Base Price
+                        // Price Breakdown
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
                             color: AppColors.bgLight,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          child: Column(
                             children: [
-                              const Text(
-                                'Base Price',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: AppColors.textDark,
-                                  fontWeight: FontWeight.w500,
-                                ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Base Service Price',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: AppColors.textDark,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    price,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                price,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
+                              if (priceType != 'inspection') ...[
+                                const Divider(height: 24),
+                                _buildPriceInfoRow('Visiting Charge', 'Applicable'),
+                                const SizedBox(height: 8),
+                                _buildPriceInfoRow('GST @18%', 'On total amount'),
+                                const Divider(height: 24),
+                                const Row(
+                                  children: [
+                                    Icon(Icons.info_outline, size: 16, color: AppColors.primary),
+                                    SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Final bill may vary based on technician inspection',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.textGray,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
+                              ],
                             ],
                           ),
                         ),
@@ -152,11 +182,11 @@ class ServiceDetailsPage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 12),
+                        _buildIncludedItem('Professional technician visit'),
                         _buildIncludedItem('General checkup and diagnostics'),
-                        _buildIncludedItem('Gas pressure check'),
-                        _buildIncludedItem('Filter cleaning'),
-                        _buildIncludedItem('Temperature check'),
+                        _buildIncludedItem('Performance inspection'),
                         _buildIncludedItem('Basic troubleshooting'),
+                        _buildIncludedItem('Service completion report'),
                         const SizedBox(height: 24),
                         
                         // What's Not Included
@@ -169,9 +199,45 @@ class ServiceDetailsPage extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _buildNotIncludedItem('Gas refilling (charged separately)'),
-                        _buildNotIncludedItem('Spare parts replacement'),
-                        _buildNotIncludedItem('Deep cleaning'),
+                        _buildNotIncludedItem('Spare parts replacement (charged separately)'),
+                        _buildNotIncludedItem('Additional materials (copper pipe, stand, etc.)'),
+                        _buildNotIncludedItem('Gas refilling (if applicable)'),
+                        _buildNotIncludedItem('Deep cleaning or overhaul'),
+                        const SizedBox(height: 24),
+                        
+                        // Additional Info
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.blue.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                '📋 Service Policy',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textDark,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                '• Visiting charge is mandatory and non-refundable\n• Final bill amount will be determined after technician inspection\n• Additional charges may apply for parts and materials\n• Payment to be made after service completion',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textDark,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -203,6 +269,7 @@ class ServiceDetailsPage extends StatelessWidget {
                       builder: (context) => BookSlotPage(
                         serviceName: serviceName,
                         price: price,
+                        basePrice: basePrice.toDouble(),
                       ),
                     ),
                   );
@@ -215,7 +282,7 @@ class ServiceDetailsPage extends StatelessWidget {
                   ),
                 ),
                 child: const Text(
-                  'Proceed to book',
+                  'Proceed to Book',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -227,6 +294,29 @@ class ServiceDetailsPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPriceInfoRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            color: AppColors.textDark,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textDark,
+          ),
+        ),
+      ],
     );
   }
 

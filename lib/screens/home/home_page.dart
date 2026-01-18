@@ -8,6 +8,8 @@ import '../wallet_page.dart';
 import '../support_page.dart';
 import '../profile_page.dart';
 import 'service_category_page.dart';
+import '../refrigerator/refrigerator_type_page.dart';
+import '../washing_machine/washing_machine_type_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
@@ -81,15 +83,45 @@ class HomeContent extends StatelessWidget {
   const HomeContent({Key? key}) : super(key: key);
 
   void _navigateToService(BuildContext context, String serviceType, IconData icon) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ServiceCategoryPage(
-          serviceType: serviceType,
-          icon: icon,
+    // AC Repair - Goes to full flow
+    if (serviceType == 'AC Repair') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ServiceCategoryPage(
+            serviceType: serviceType,
+            icon: icon,
+          ),
         ),
-      ),
-    );
+      );
+    } 
+    // Refrigerator - Direct to type selection
+    else if (serviceType == 'Refrigerator') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const RefrigeratorTypePage(),
+        ),
+      );
+    } 
+    // Washing Machine - Direct to type selection
+    else if (serviceType == 'Washing Machine') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const WashingMachineTypePage(),
+        ),
+      );
+    } 
+    // Others - Coming soon
+    else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Service coming soon!'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
@@ -269,35 +301,85 @@ class HomeContent extends StatelessWidget {
                 mainAxisSpacing: 16,
                 crossAxisSpacing: 16,
                 children: [
+                  // AC Repair - Full flow
                   GestureDetector(
                     onTap: () => _navigateToService(context, 'AC Repair', Icons.ac_unit),
-                    child: const ServiceCard(icon: Icons.ac_unit, title: 'AC Repair', bgColor: AppColors.serviceBg1),
+                    child: const ServiceCard(
+                      icon: Icons.ac_unit,
+                      title: 'AC Repair',
+                      bgColor: AppColors.serviceBg1,
+                    ),
                   ),
-                  GestureDetector(
-                    onTap: () => _navigateToService(context, 'TV Repair', Icons.tv),
-                    child: const ServiceCard(icon: Icons.tv, title: 'TV Repair', bgColor: AppColors.serviceBg2),
-                  ),
+                  
+                  // Refrigerator - Direct flow
                   GestureDetector(
                     onTap: () => _navigateToService(context, 'Refrigerator', Icons.kitchen),
-                    child: const ServiceCard(icon: Icons.kitchen, title: 'Refrigerator', bgColor: AppColors.serviceBg3),
+                    child: const ServiceCard(
+                      icon: Icons.kitchen,
+                      title: 'Refrigerator',
+                      bgColor: AppColors.serviceBg2,
+                    ),
                   ),
+                  
+                  // Washing Machine - Direct flow
                   GestureDetector(
                     onTap: () => _navigateToService(context, 'Washing Machine', Icons.local_laundry_service),
-                    child: const ServiceCard(icon: Icons.local_laundry_service, title: 'Washing Machine', bgColor: AppColors.serviceBg2),
+                    child: const ServiceCard(
+                      icon: Icons.local_laundry_service,
+                      title: 'Washing Machine',
+                      bgColor: AppColors.serviceBg3,
+                    ),
                   ),
+                  
+                  // TV Repair - Coming soon
+                  GestureDetector(
+                    onTap: () => _navigateToService(context, 'TV Repair', Icons.tv),
+                    child: const ServiceCard(
+                      icon: Icons.tv,
+                      title: 'TV Repair',
+                      bgColor: AppColors.serviceBg1,
+                    ),
+                  ),
+                  
+                  // Electrician - Coming soon
                   GestureDetector(
                     onTap: () => _navigateToService(context, 'Electrician', Icons.bolt),
-                    child: const ServiceCard(icon: Icons.bolt, title: 'Electrician', bgColor: AppColors.serviceBg3),
+                    child: const ServiceCard(
+                      icon: Icons.bolt,
+                      title: 'Electrician',
+                      bgColor: AppColors.serviceBg2,
+                    ),
                   ),
+                  
+                  // Plumber - Coming soon
                   GestureDetector(
                     onTap: () => _navigateToService(context, 'Plumber', Icons.build),
-                    child: const ServiceCard(icon: Icons.build, title: 'Plumber', bgColor: AppColors.serviceBg1),
+                    child: const ServiceCard(
+                      icon: Icons.build,
+                      title: 'Plumber',
+                      bgColor: AppColors.serviceBg3,
+                    ),
                   ),
+                  
+                  // Cleaning - Coming soon
                   GestureDetector(
                     onTap: () => _navigateToService(context, 'Cleaning', Icons.cleaning_services),
-                    child: const ServiceCard(icon: Icons.cleaning_services, title: 'Cleaning', bgColor: AppColors.serviceBg2),
+                    child: const ServiceCard(
+                      icon: Icons.cleaning_services,
+                      title: 'Cleaning',
+                      bgColor: AppColors.serviceBg1,
+                    ),
                   ),
-                  const ServiceCard(icon: Icons.more_horiz, title: 'More', bgColor: AppColors.serviceBg3),
+                  
+                  // More - Coming soon
+                  GestureDetector(
+                    onTap: () => _navigateToService(context, 'More', Icons.more_horiz),
+                    child: const ServiceCard(
+                      icon: Icons.more_horiz,
+                      title: 'More',
+                      bgColor: AppColors.serviceBg2,
+                    ),
+                  ),
                 ],
               ),
             ),

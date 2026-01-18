@@ -37,12 +37,6 @@ class _PaymentPageState extends State<PaymentPage> {
   // Area type selection (for visiting charge)
   String _selectedArea = 'standard'; // 'standard' = ₹299, 'premium' = ₹399
 
-  // Payment breakdown (calculated by backend)
-  double? _visitingCharge;
-  double? _taxableAmount;
-  double? _gstAmount;
-  double? _totalAmount;
-
   @override
   void initState() {
     super.initState();
@@ -56,6 +50,24 @@ class _PaymentPageState extends State<PaymentPage> {
   void dispose() {
     _razorpay.clear();
     super.dispose();
+  }
+
+  // ==================== GST CALCULATIONS ====================
+  
+  double get visitingCharge {
+    return _selectedArea == 'standard' ? 299.0 : 399.0;
+  }
+
+  double get taxableAmount {
+    return widget.serviceCharge + visitingCharge;
+  }
+
+  double get gstAmount {
+    return taxableAmount * 0.18; // 18% GST
+  }
+
+  double get totalAmount {
+    return taxableAmount + gstAmount;
   }
 
   // ==================== RAZORPAY CALLBACKS ====================
@@ -102,7 +114,7 @@ class _PaymentPageState extends State<PaymentPage> {
           MaterialPageRoute(
             builder: (context) => BookingSuccessPage(
               serviceName: widget.serviceName,
-              amount: _totalAmount ?? 0,
+              amount: totalAmount,
               date: widget.date,
               timeSlot: widget.timeSlot,
               bookingId: _currentBookingId!,
@@ -190,18 +202,10 @@ class _PaymentPageState extends State<PaymentPage> {
         userId: firebaseUser.uid,
       );
 
-      // Step 3: Store payment breakdown from backend
-      setState(() {
-        _visitingCharge = orderData['breakdown']['visitingCharge'];
-        _taxableAmount = orderData['breakdown']['taxableAmount'];
-        _gstAmount = orderData['breakdown']['gstAmount'];
-        _totalAmount = orderData['breakdown']['totalAmount'];
-      });
-
-      // Step 4: Update booking with Razorpay order ID and breakdown
+      // Step 3: Update booking with Razorpay order ID and breakdown
       await _updateBookingWithOrderDetails(bookingId, orderData);
 
-      // Step 5: Open Razorpay checkout
+      // Step 4: Open Razorpay checkout
       debugPrint('💳 Opening Razorpay checkout...');
       _openRazorpayCheckout(orderData, userData);
 
@@ -230,12 +234,12 @@ class _PaymentPageState extends State<PaymentPage> {
       userName: userData.name,
       userPhone: userData.mobile,
       service: widget.serviceName,
-      status: 'pending', // Will change to 'paid' after verification
+      status: 'pending',
       serviceCharge: widget.serviceCharge,
-      visitingCharge: 0, // Will be updated from backend
-      taxableAmount: 0,
-      gstAmount: 0,
-      totalAmount: 0,
+      visitingCharge: visitingCharge,
+      taxableAmount: taxableAmount,
+      gstAmount: gstAmount,
+      totalAmount: totalAmount,
       paymentStatus: 'pending',
       scheduledTime: '${widget.date} ${widget.timeSlot}',
       address: '${widget.address['address']}, ${widget.address['city']}',
@@ -252,20 +256,25 @@ class _PaymentPageState extends State<PaymentPage> {
     String bookingId,
     Map<String, dynamic> orderData,
   ) async {
-    await FirebaseService._realtimeDb.ref('bookings/$bookingId').update({
-      'razorpayOrderId': orderData['orderId'],
-      'visitingCharge': orderData['breakdown']['visitingCharge'],
-      'taxableAmount': orderData['breakdown']['taxableAmount'],
-      'gstAmount': orderData['breakdown']['gstAmount'],
-      'totalAmount': orderData['breakdown']['totalAmount'],
-      'updatedAt': DateTime.now().toIso8601String(),
-    });
+    try {
+      await FirebaseService.updateBookingOrderDetails(
+        bookingId: bookingId,
+        razorpayOrderId: orderData['orderId'] as String,
+        visitingCharge: visitingCharge,
+        taxableAmount: taxableAmount,
+        gstAmount: gstAmount,
+        totalAmount: totalAmount,
+      );
+    } catch (e) {
+      debugPrint('❌ Error updating booking order details: $e');
+      rethrow;
+    }
   }
 
   void _openRazorpayCheckout(Map<String, dynamic> orderData, dynamic userData) {
     var options = {
-      'key': 'YOUR_RAZORPAY_KEY_ID', // 🔒 REPLACE with your Razorpay Test Key
-      'amount': orderData['amount'], // Amount in paise (from backend)
+      'key': 'rzp_test_S4yQ9pfJFZGHEV', // 🔒 Your Razorpay Test Key
+      'amount': (totalAmount * 100).toInt(), // Amount in paise
       'currency': 'INR',
       'name': 'Bharat Doorstep Repair',
       'description': widget.serviceName,
@@ -320,13 +329,15 @@ class _PaymentPageState extends State<PaymentPage> {
                 const SizedBox(height: 8),
                 _buildPriceRow(
                   'Visiting Charge',
-                  _selectedArea == 'standard' ? 299 : 399,
+                  visitingCharge,
                   subtitle: _selectedArea == 'standard'
                       ? '(Standard Area)'
                       : '(Premium Area)',
                 ),
                 const Divider(height: 24),
-                _buildPriceRow('GST @ 18%', null, isCalculating: true),
+                _buildPriceRow('Taxable Amount', taxableAmount, isBold: true),
+                const SizedBox(height: 8),
+                _buildPriceRow('GST @ 18%', gstAmount),
                 const Divider(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -340,7 +351,7 @@ class _PaymentPageState extends State<PaymentPage> {
                       ),
                     ),
                     Text(
-                      '₹${_calculateDisplayTotal().toStringAsFixed(2)}',
+                      '₹${totalAmount.toStringAsFixed(2)}',
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -392,7 +403,7 @@ class _PaymentPageState extends State<PaymentPage> {
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Visiting charge is mandatory and non-refundable. GST @18% will be applied on total taxable amount.',
+                            'Visiting charge is mandatory and non-refundable. GST @18% is applied on total taxable amount.',
                             style: TextStyle(fontSize: 13),
                           ),
                         ),
@@ -454,15 +465,21 @@ class _PaymentPageState extends State<PaymentPage> {
     );
   }
 
-  Widget _buildPriceRow(String label, double? amount,
-      {String? subtitle, bool isCalculating = false}) {
+  Widget _buildPriceRow(String label, double amount,
+      {String? subtitle, bool isBold = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(fontSize: 14)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isBold ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
             if (subtitle != null)
               Text(
                 subtitle,
@@ -471,12 +488,10 @@ class _PaymentPageState extends State<PaymentPage> {
           ],
         ),
         Text(
-          isCalculating
-              ? 'Calculated on backend'
-              : '₹${amount!.toStringAsFixed(2)}',
-          style: const TextStyle(
+          '₹${amount.toStringAsFixed(2)}',
+          style: TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w600,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
           ),
         ),
       ],
@@ -527,12 +542,5 @@ class _PaymentPageState extends State<PaymentPage> {
         ),
       ),
     );
-  }
-
-  double _calculateDisplayTotal() {
-    final visitingCharge = _selectedArea == 'standard' ? 299 : 399;
-    final taxable = widget.serviceCharge + visitingCharge;
-    final gst = taxable * 0.18;
-    return taxable + gst;
   }
 }

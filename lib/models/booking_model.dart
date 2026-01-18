@@ -4,15 +4,15 @@ class BookingModel {
   final String userName;
   final String userPhone;
   final String service;
-  final String status; // pending, paid, confirmed, accepted, in_progress, completed, cancelled, payment_failed
-  final double serviceCharge; // Base service price
-  final double visitingCharge; // Area-wise visiting charge (299 or 399)
-  final double taxableAmount; // serviceCharge + visitingCharge
-  final double gstAmount; // 18% of taxableAmount
-  final double totalAmount; // taxableAmount + gstAmount
-  final String? paymentId; // Razorpay payment ID
-  final String? razorpayOrderId; // Razorpay order ID
-  final String paymentStatus; // pending, completed, failed
+  final String status;
+  final double serviceCharge;
+  final double visitingCharge;
+  final double taxableAmount;
+  final double gstAmount;
+  final double totalAmount;
+  final String? paymentId;
+  final String? razorpayOrderId;
+  final String paymentStatus;
   final String scheduledTime;
   final String? address;
   final String? city;
@@ -21,9 +21,6 @@ class BookingModel {
   final String? notes;
   final DateTime createdAt;
   final DateTime updatedAt;
-
-  // REMOVED: double earnings field (this was confusing)
-  // Company handles all money - no need for "earnings" in booking
 
   BookingModel({
     required this.id,
@@ -85,11 +82,12 @@ class BookingModel {
       userPhone: json['userPhone'] ?? '',
       service: json['service'] ?? '',
       status: json['status'] ?? 'pending',
-      serviceCharge: (json['serviceCharge'] ?? 0).toDouble(),
-      visitingCharge: (json['visitingCharge'] ?? 0).toDouble(),
-      taxableAmount: (json['taxableAmount'] ?? 0).toDouble(),
-      gstAmount: (json['gstAmount'] ?? 0).toDouble(),
-      totalAmount: (json['totalAmount'] ?? 0).toDouble(),
+      // ✅ FIX: Safe conversion from any number type to double
+      serviceCharge: _toDouble(json['serviceCharge']),
+      visitingCharge: _toDouble(json['visitingCharge']),
+      taxableAmount: _toDouble(json['taxableAmount']),
+      gstAmount: _toDouble(json['gstAmount']),
+      totalAmount: _toDouble(json['totalAmount']),
       paymentId: json['paymentId'],
       razorpayOrderId: json['razorpayOrderId'],
       paymentStatus: json['paymentStatus'] ?? 'pending',
@@ -106,6 +104,17 @@ class BookingModel {
           ? DateTime.parse(json['updatedAt'])
           : DateTime.now(),
     );
+  }
+
+  get earnings => null;
+
+  // ✅ Helper method to safely convert any number type to double
+  static double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
   }
 
   BookingModel copyWith({

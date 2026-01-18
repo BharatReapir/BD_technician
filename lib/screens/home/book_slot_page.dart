@@ -5,11 +5,13 @@ import 'checkout_page.dart';
 class BookSlotPage extends StatefulWidget {
   final String serviceName;
   final String price;
+  final double basePrice;
 
   const BookSlotPage({
     Key? key,
     required this.serviceName,
     required this.price,
+    required this.basePrice,
   }) : super(key: key);
 
   @override
@@ -354,6 +356,7 @@ class _BookSlotPageState extends State<BookSlotPage> {
                             builder: (context) => CheckoutPage(
                               serviceName: widget.serviceName,
                               price: widget.price,
+                              basePrice: widget.basePrice,
                               date: dates[selectedDateIndex]['date']!,
                               timeSlot: timeSlots[selectedTimeSlotIndex],
                               address: addresses[selectedAddressIndex],
@@ -370,7 +373,7 @@ class _BookSlotPageState extends State<BookSlotPage> {
                   ),
                 ),
                 child: const Text(
-                  'Continue to Payment',
+                  'Continue to Checkout',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,

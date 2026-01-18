@@ -338,6 +338,32 @@ class FirebaseService {
     }
   }
 
+  /// Update booking with Razorpay order details and breakdown
+  static Future<void> updateBookingOrderDetails({
+    required String bookingId,
+    required String razorpayOrderId,
+    required double visitingCharge,
+    required double taxableAmount,
+    required double gstAmount,
+    required double totalAmount,
+  }) async {
+    try {
+      print('💰 Updating booking order details: $bookingId');
+      await _realtimeDb.ref('bookings/$bookingId').update({
+        'razorpayOrderId': razorpayOrderId,
+        'visitingCharge': visitingCharge,
+        'taxableAmount': taxableAmount,
+        'gstAmount': gstAmount,
+        'totalAmount': totalAmount,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      print('✅ Booking order details updated successfully');
+    } catch (e) {
+      print('❌ Error updating booking order details: $e');
+      rethrow;
+    }
+  }
+
   /// Assign technician to booking
   static Future<void> assignTechnicianToBooking(
       String bookingId, String technicianId, String technicianName) async {

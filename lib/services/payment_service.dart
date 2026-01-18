@@ -6,23 +6,9 @@ class PaymentService {
   // 🔒 REPLACE THIS with your actual backend URL
   // For local testing: http://localhost:5001/YOUR_PROJECT_ID/us-central1
   // For production: https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net
-  static const String _baseUrl = 'YOUR_BACKEND_URL_HERE';
+  static const String _baseUrl = 'https://us-central1-bharat-doorstep-native.cloudfunctions.net';
 
-  /// Create Razorpay Order (Backend calculates GST + Visiting Charge)
-  /// 
-  /// Returns: {
-  ///   "orderId": "order_xyz123",
-  ///   "amount": 153282, // in paise
-  ///   "currency": "INR",
-  ///   "bookingId": "abc123",
-  ///   "breakdown": {
-  ///     "serviceCharge": 1000,
-  ///     "visitingCharge": 299,
-  ///     "taxableAmount": 1299,
-  ///     "gstAmount": 233.82,
-  ///     "totalAmount": 1532.82
-  ///   }
-  /// }
+
   static Future<Map<String, dynamic>> createOrder({
     required String bookingId,
     required double serviceCharge,

@@ -7,10 +7,12 @@ import '../models/booking_model.dart';
 import '../firebase_options.dart';
 
 class FirebaseService {
+  // ✅ SINGLETON: Create database instance ONCE and reuse it
   static FirebaseDatabase? _realtimeDbInstance;
+  static bool _isInitialized = false;
   
   static FirebaseDatabase get _realtimeDb {
-    if (_realtimeDbInstance == null) {
+    if (_realtimeDbInstance == null || !_isInitialized) {
       try {
         String? databaseURL;
         
@@ -35,8 +37,9 @@ class FirebaseService {
           }
         }
         
-        print('Initializing Firebase Realtime Database with URL: $databaseURL');
+        print('🔥 Initializing Firebase Realtime Database with URL: $databaseURL');
         
+        // ✅ FIX: Use instanceFor with the app and databaseURL
         _realtimeDbInstance = FirebaseDatabase.instanceFor(
           app: Firebase.app(),
           databaseURL: databaseURL!,
@@ -47,9 +50,10 @@ class FirebaseService {
           _realtimeDbInstance!.setPersistenceEnabled(true);
         }
         
-        print('Firebase Realtime Database initialized successfully');
+        _isInitialized = true;
+        print('✅ Firebase Realtime Database initialized successfully');
       } catch (e) {
-        print('Error initializing Firebase Database: $e');
+        print('❌ Error initializing Firebase Database: $e');
         rethrow;
       }
     }
@@ -61,14 +65,14 @@ class FirebaseService {
   /// Create or update user
   static Future<void> saveUser(UserModel user) async {
     try {
-      print('Saving user: ${user.uid}');
+      print('💾 Saving user: ${user.uid}');
       final userJson = user.toJson();
-      print('User data: $userJson');
+      print('📄 User data: $userJson');
       
       await _realtimeDb.ref('users/${user.uid}').set(userJson);
-      print('User saved successfully to Realtime Database');
+      print('✅ User saved successfully to Realtime Database');
     } catch (e) {
-      print('Error saving user: $e');
+      print('❌ Error saving user: $e');
       rethrow;
     }
   }
@@ -76,16 +80,16 @@ class FirebaseService {
   /// Get user by ID
   static Future<UserModel?> getUser(String uid) async {
     try {
-      print('Fetching user: $uid');
+      print('🔍 Fetching user: $uid');
       final snapshot = await _realtimeDb.ref('users/$uid').get();
       if (snapshot.exists && snapshot.value != null) {
-        print('User found: $uid');
+        print('✅ User found: $uid');
         return UserModel.fromJson(Map<String, dynamic>.from(snapshot.value as Map));
       }
-      print('User not found: $uid');
+      print('⚠️ User not found: $uid');
       return null;
     } catch (e) {
-      print('Error getting user: $e');
+      print('❌ Error getting user: $e');
       return null;
     }
   }
@@ -95,9 +99,9 @@ class FirebaseService {
     try {
       data['updatedAt'] = DateTime.now().toIso8601String();
       await _realtimeDb.ref('users/$uid').update(data);
-      print('User updated: $uid');
+      print('✅ User updated: $uid');
     } catch (e) {
-      print('Error updating user: $e');
+      print('❌ Error updating user: $e');
       rethrow;
     }
   }
@@ -106,9 +110,9 @@ class FirebaseService {
   static Future<void> deleteUser(String uid) async {
     try {
       await _realtimeDb.ref('users/$uid').remove();
-      print('User deleted: $uid');
+      print('✅ User deleted: $uid');
     } catch (e) {
-      print('Error deleting user: $e');
+      print('❌ Error deleting user: $e');
       rethrow;
     }
   }
@@ -142,7 +146,7 @@ class FirebaseService {
         return TechnicianModel.fromJson(techData);
       }
       
-      print('❌ Technician not found: $uid');
+      print('⚠️ Technician not found: $uid');
       return null;
     } catch (e) {
       print('❌ Error getting technician: $e');
@@ -213,7 +217,7 @@ class FirebaseService {
           .where((tech) => tech.city == city && tech.isOnline == true)
           .toList();
     } catch (e) {
-      print('Error getting online technicians: $e');
+      print('❌ Error getting online technicians: $e');
       return [];
     }
   }
@@ -233,7 +237,7 @@ class FirebaseService {
               tech.specializations.contains(service))
           .toList();
     } catch (e) {
-      print('Error getting technicians by service: $e');
+      print('❌ Error getting technicians by service: $e');
       return [];
     }
   }
@@ -269,20 +273,22 @@ class FirebaseService {
   /// Create new booking
   static Future<String> createBooking(BookingModel booking) async {
     try {
-      print('Creating booking in Realtime Database...');
+      print('📝 Creating booking in Realtime Database...');
+      
+      // ✅ Use the singleton _realtimeDb instance
       final bookingRef = _realtimeDb.ref('bookings').push();
       final bookingId = bookingRef.key!;
       
       final bookingJson = booking.toJson();
       bookingJson['id'] = bookingId;
       
-      print('Booking data: $bookingJson');
+      print('📄 Booking data: $bookingJson');
       await bookingRef.set(bookingJson);
-      print('Booking created with ID: $bookingId');
+      print('✅ Booking created with ID: $bookingId');
       
       return bookingId;
     } catch (e) {
-      print('Error creating booking: $e');
+      print('❌ Error creating booking: $e');
       rethrow;
     }
   }
@@ -296,7 +302,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error getting booking: $e');
+      print('❌ Error getting booking: $e');
       return null;
     }
   }
@@ -311,7 +317,7 @@ class FirebaseService {
       });
       print('✅ Booking status updated: $bookingId -> $status');
     } catch (e) {
-      print('Error updating booking status: $e');
+      print('❌ Error updating booking status: $e');
       rethrow;
     }
   }
@@ -327,7 +333,7 @@ class FirebaseService {
       });
       print('✅ Payment ID updated: $bookingId -> $paymentId');
     } catch (e) {
-      print('Error updating payment ID: $e');
+      print('❌ Error updating payment ID: $e');
       rethrow;
     }
   }
@@ -342,8 +348,9 @@ class FirebaseService {
         'status': 'accepted',
         'updatedAt': DateTime.now().toIso8601String(),
       });
+      print('✅ Technician assigned to booking: $bookingId');
     } catch (e) {
-      print('Error assigning technician: $e');
+      print('❌ Error assigning technician: $e');
       rethrow;
     }
   }
@@ -351,6 +358,7 @@ class FirebaseService {
   /// Get user's bookings
   static Future<List<BookingModel>> getUserBookings(String userId) async {
     try {
+      print('🔍 Fetching bookings for user: $userId');
       final snapshot = await _realtimeDb.ref('bookings')
           .orderByChild('userId')
           .equalTo(userId)
@@ -358,14 +366,18 @@ class FirebaseService {
           
       if (snapshot.exists && snapshot.value != null) {
         final bookingsMap = Map<String, dynamic>.from(snapshot.value as Map);
-        return bookingsMap.entries
+        final bookings = bookingsMap.entries
             .map((entry) => BookingModel.fromJson(Map<String, dynamic>.from(entry.value)))
             .toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        
+        print('✅ Found ${bookings.length} bookings for user');
+        return bookings;
       }
+      print('⚠️ No bookings found for user');
       return [];
     } catch (e) {
-      print('Error getting user bookings: $e');
+      print('❌ Error getting user bookings: $e');
       return [];
     }
   }
@@ -374,6 +386,7 @@ class FirebaseService {
   static Future<List<BookingModel>> getTechnicianBookings(
       String technicianId) async {
     try {
+      print('🔍 Fetching bookings for technician: $technicianId');
       final snapshot = await _realtimeDb.ref('bookings')
           .orderByChild('technicianId')
           .equalTo(technicianId)
@@ -381,14 +394,18 @@ class FirebaseService {
           
       if (snapshot.exists && snapshot.value != null) {
         final bookingsMap = Map<String, dynamic>.from(snapshot.value as Map);
-        return bookingsMap.entries
+        final bookings = bookingsMap.entries
             .map((entry) => BookingModel.fromJson(Map<String, dynamic>.from(entry.value)))
             .toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        
+        print('✅ Found ${bookings.length} bookings for technician');
+        return bookings;
       }
+      print('⚠️ No bookings found for technician');
       return [];
     } catch (e) {
-      print('Error getting technician bookings: $e');
+      print('❌ Error getting technician bookings: $e');
       return [];
     }
   }
@@ -399,6 +416,7 @@ class FirebaseService {
     required List<String> specializations,
   }) async {
     try {
+      print('🔍 Fetching pending bookings for city: $city');
       final snapshot = await _realtimeDb.ref('bookings')
           .orderByChild('status')
           .equalTo('pending')
@@ -406,16 +424,20 @@ class FirebaseService {
           
       if (snapshot.exists && snapshot.value != null) {
         final bookingsMap = Map<String, dynamic>.from(snapshot.value as Map);
-        return bookingsMap.entries
+        final filteredBookings = bookingsMap.entries
             .map((entry) => BookingModel.fromJson(Map<String, dynamic>.from(entry.value)))
             .where((booking) =>
                 specializations.contains(booking.service) &&
-                (booking.address?.contains(city) ?? false))
+                (booking.city?.contains(city) ?? booking.address?.contains(city) ?? false))
             .toList();
+        
+        print('✅ Found ${filteredBookings.length} pending bookings');
+        return filteredBookings;
       }
+      print('⚠️ No pending bookings found');
       return [];
     } catch (e) {
-      print('Error getting pending bookings: $e');
+      print('❌ Error getting pending bookings: $e');
       return [];
     }
   }

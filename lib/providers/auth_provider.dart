@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
 import '../models/user_model.dart';
 import '../models/technician_model.dart';
 import '../services/firebase_service.dart';
@@ -15,7 +14,10 @@ class AuthProvider extends ChangeNotifier {
   String _userType = 'user'; // 'user' or 'technician'
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  
+  // ✅ REMOVED: Don't create separate database instance
+  // final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  
   static String? _verificationId;
 
   UserModel? get user => _user;
@@ -47,7 +49,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ✅ ADDED: Send OTP for Phone Authentication
+  // ✅ Send OTP for Phone Authentication
   Future<void> sendOTP(String phoneNumber) async {
     await _auth.verifyPhoneNumber(
       phoneNumber: '+91$phoneNumber',
@@ -68,7 +70,7 @@ class AuthProvider extends ChangeNotifier {
     );
   }
 
-  // ✅ ADDED: Verify OTP
+  // ✅ Verify OTP
   Future<UserCredential> verifyOTP(String otp) async {
     debugPrint('🔐 Verifying OTP with ID: $_verificationId');
     
@@ -127,7 +129,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       debugPrint('👤 Loading regular user from Firebase...');
       
-      // 1️⃣ Try Firebase Realtime DB first
+      // 1️⃣ Try Firebase Realtime DB first using FirebaseService
       final userData = await FirebaseService.getUser(uid);
 
       if (userData != null) {
@@ -167,18 +169,14 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Load technician - ✅ UPDATED with Realtime Database logic
   Future<void> _loadTechnician(String uid) async {
     try {
       debugPrint('🔧 Loading technician from Firebase...');
       
-      // 1️⃣ Try Firebase Realtime DB first
-      final snapshot = await _database.child('technicians').child(uid).get();
+      // 1️⃣ Try Firebase Realtime DB first using FirebaseService
+      final techData = await FirebaseService.getTechnician(uid);
 
-      if (snapshot.exists) {
-        final data = Map<String, dynamic>.from(snapshot.value as Map);
-        final techData = TechnicianModel.fromJson(data);
-        
+      if (techData != null) {
         debugPrint('✅ Technician loaded from Firebase: ${techData.name}');
         debugPrint('💰 Wallet Balance: ₹${techData.walletBalance}');
         
@@ -218,35 +216,20 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ✅ ADDED: Get technician data from Realtime Database
+  // ✅ Get technician data from Realtime Database using FirebaseService
   Future<TechnicianModel?> getTechnicianData(String uid) async {
     try {
       debugPrint('🔍 Fetching technician data for UID: $uid');
-      
-      final snapshot = await _database.child('technicians').child(uid).get();
-      if (snapshot.exists) {
-        debugPrint('✅ Technician data found in Realtime DB');
-        final data = Map<String, dynamic>.from(snapshot.value as Map);
-        return TechnicianModel.fromJson(data);
-      } else {
-        debugPrint('❌ No technician data found for UID: $uid');
-        return null;
-      }
+      return await FirebaseService.getTechnician(uid);
     } catch (e) {
       debugPrint('❌ Error fetching technician data: $e');
       throw Exception('Error fetching technician data: $e');
     }
   }
 
-  // ✅ ADDED: Stream technician data from Realtime Database
+  // ✅ Stream technician data from Realtime Database using FirebaseService
   Stream<TechnicianModel?> technicianStream(String uid) {
-    return _database.child('technicians').child(uid).onValue.map((event) {
-      if (event.snapshot.exists) {
-        final data = Map<String, dynamic>.from(event.snapshot.value as Map);
-        return TechnicianModel.fromJson(data);
-      }
-      return null;
-    });
+    return FirebaseService.streamTechnician(uid);
   }
 
   /// 🔹 RELOAD USER/TECHNICIAN DATA (Call this after wallet recharge)
@@ -266,7 +249,7 @@ class AuthProvider extends ChangeNotifier {
     _isLoggedIn = true;
     _userType = 'user';
 
-    // 1️⃣ Save to Firebase
+    // 1️⃣ Save to Firebase using FirebaseService
     await FirebaseService.saveUser(user);
 
     // 2️⃣ Save locally
@@ -278,7 +261,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 🔹 SAVE TECHNICIAN AFTER OTP - ✅ UPDATED with Realtime Database logic
+  /// 🔹 SAVE TECHNICIAN AFTER OTP - ✅ UPDATED to use FirebaseService
   Future<void> saveTechnician(TechnicianModel technician) async {
     final firebaseUser = _auth.currentUser;
     if (firebaseUser == null) {
@@ -292,11 +275,8 @@ class AuthProvider extends ChangeNotifier {
     _isLoggedIn = true;
     _userType = 'technician';
 
-    // 1️⃣ Save to Firebase Realtime Database
-    await _database
-        .child('technicians')
-        .child(technician.uid)
-        .set(technician.toJson());
+    // 1️⃣ Save to Firebase using FirebaseService
+    await FirebaseService.saveTechnician(technician);
 
     // 2️⃣ Save locally
     final prefs = await SharedPreferences.getInstance();
@@ -327,17 +307,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 🔹 UPDATE TECHNICIAN STATUS - ✅ UPDATED with Realtime Database logic
+  /// 🔹 UPDATE TECHNICIAN STATUS - ✅ UPDATED to use FirebaseService
   Future<void> updateTechnicianStatus(bool isOnline) async {
     if (_technician == null) return;
 
     debugPrint('🔄 Updating technician status: ${isOnline ? "ONLINE" : "OFFLINE"}');
 
-    // Update in Realtime Database
-    await _database.child('technicians').child(_technician!.uid).update({
-      'isOnline': isOnline,
-      'updatedAt': DateTime.now().millisecondsSinceEpoch,
-    });
+    // Update using FirebaseService
+    await FirebaseService.updateTechnicianStatus(_technician!.uid, isOnline);
     
     _technician = _technician!.copyWith(isOnline: isOnline);
 
@@ -348,16 +325,13 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 🔹 LOGOUT - ✅ UPDATED with technician offline status
+  /// 🔹 LOGOUT - ✅ UPDATED to use FirebaseService
   Future<void> logout() async {
     debugPrint('👋 Logging out...');
     
     // If technician, set offline before logout
     if (_technician != null && _technician!.isOnline) {
-      await _database.child('technicians').child(_technician!.uid).update({
-        'isOnline': false,
-        'updatedAt': DateTime.now().millisecondsSinceEpoch,
-      });
+      await FirebaseService.updateTechnicianStatus(_technician!.uid, false);
     }
 
     await _auth.signOut();
@@ -366,7 +340,7 @@ class AuthProvider extends ChangeNotifier {
     _technician = null;
     _isLoggedIn = false;
     _userType = 'user';
-    _verificationId = null; // ✅ Clear verification ID
+    _verificationId = null;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
@@ -374,7 +348,7 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ✅ ADDED: Get current Firebase user
+  // ✅ Get current Firebase user
   User? getCurrentUser() {
     return _auth.currentUser;
   }

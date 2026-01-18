@@ -3,114 +3,132 @@ class BookingModel {
   final String userId;
   final String userName;
   final String userPhone;
-  final String? technicianId;
-  final String? technicianName;
   final String service;
-  final String status; // 'pending', 'accepted', 'in_progress', 'completed', 'cancelled'
-  final double earnings;
+  final String status; // pending, paid, confirmed, accepted, in_progress, completed, cancelled, payment_failed
+  final double serviceCharge; // Base service price
+  final double visitingCharge; // Area-wise visiting charge (299 or 399)
+  final double taxableAmount; // serviceCharge + visitingCharge
+  final double gstAmount; // 18% of taxableAmount
+  final double totalAmount; // taxableAmount + gstAmount
+  final String? paymentId; // Razorpay payment ID
+  final String? razorpayOrderId; // Razorpay order ID
+  final String paymentStatus; // pending, completed, failed
   final String scheduledTime;
   final String? address;
-  final String? notes;
-  
-  // Location fields
-  final double? latitude;
-  final double? longitude;
-  final String? area;
   final String? city;
-  final String? pincode;
-  
+  final String? technicianId;
+  final String? technicianName;
+  final String? notes;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  // REMOVED: double earnings field (this was confusing)
+  // Company handles all money - no need for "earnings" in booking
 
   BookingModel({
     required this.id,
     required this.userId,
     required this.userName,
     required this.userPhone,
-    this.technicianId,
-    this.technicianName,
     required this.service,
-    this.status = 'pending',
-    required this.earnings,
+    required this.status,
+    required this.serviceCharge,
+    required this.visitingCharge,
+    required this.taxableAmount,
+    required this.gstAmount,
+    required this.totalAmount,
+    this.paymentId,
+    this.razorpayOrderId,
+    this.paymentStatus = 'pending',
     required this.scheduledTime,
     this.address,
-    this.notes,
-    this.latitude,
-    this.longitude,
-    this.area,
     this.city,
-    this.pincode,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-  })  : createdAt = createdAt ?? DateTime.now(),
-        updatedAt = updatedAt ?? DateTime.now();
+    this.technicianId,
+    this.technicianName,
+    this.notes,
+    required this.createdAt,
+    required this.updatedAt,
+  });
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'userId': userId,
-        'userName': userName,
-        'userPhone': userPhone,
-        'technicianId': technicianId,
-        'technicianName': technicianName,
-        'service': service,
-        'status': status,
-        'earnings': earnings,
-        'scheduledTime': scheduledTime,
-        'address': address,
-        'notes': notes,
-        'latitude': latitude,
-        'longitude': longitude,
-        'area': area,
-        'city': city,
-        'pincode': pincode,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-      };
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'userId': userId,
+      'userName': userName,
+      'userPhone': userPhone,
+      'service': service,
+      'status': status,
+      'serviceCharge': serviceCharge,
+      'visitingCharge': visitingCharge,
+      'taxableAmount': taxableAmount,
+      'gstAmount': gstAmount,
+      'totalAmount': totalAmount,
+      'paymentId': paymentId,
+      'razorpayOrderId': razorpayOrderId,
+      'paymentStatus': paymentStatus,
+      'scheduledTime': scheduledTime,
+      'address': address,
+      'city': city,
+      'technicianId': technicianId,
+      'technicianName': technicianName,
+      'notes': notes,
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
+    };
+  }
 
-  factory BookingModel.fromJson(Map<String, dynamic> json) => BookingModel(
-        id: json['id'] ?? '',
-        userId: json['userId'] ?? '',
-        userName: json['userName'] ?? '',
-        userPhone: json['userPhone'] ?? '',
-        technicianId: json['technicianId'],
-        technicianName: json['technicianName'],
-        service: json['service'] ?? '',
-        status: json['status'] ?? 'pending',
-        earnings: (json['earnings'] ?? 0.0).toDouble(),
-        scheduledTime: json['scheduledTime'] ?? '',
-        address: json['address'],
-        notes: json['notes'],
-        latitude: json['latitude'] != null ? (json['latitude'] as num).toDouble() : null,
-        longitude: json['longitude'] != null ? (json['longitude'] as num).toDouble() : null,
-        area: json['area'],
-        city: json['city'],
-        pincode: json['pincode'],
-        createdAt: json['createdAt'] != null
-            ? DateTime.parse(json['createdAt'])
-            : DateTime.now(),
-        updatedAt: json['updatedAt'] != null
-            ? DateTime.parse(json['updatedAt'])
-            : DateTime.now(),
-      );
+  factory BookingModel.fromJson(Map<String, dynamic> json) {
+    return BookingModel(
+      id: json['id'] ?? '',
+      userId: json['userId'] ?? '',
+      userName: json['userName'] ?? '',
+      userPhone: json['userPhone'] ?? '',
+      service: json['service'] ?? '',
+      status: json['status'] ?? 'pending',
+      serviceCharge: (json['serviceCharge'] ?? 0).toDouble(),
+      visitingCharge: (json['visitingCharge'] ?? 0).toDouble(),
+      taxableAmount: (json['taxableAmount'] ?? 0).toDouble(),
+      gstAmount: (json['gstAmount'] ?? 0).toDouble(),
+      totalAmount: (json['totalAmount'] ?? 0).toDouble(),
+      paymentId: json['paymentId'],
+      razorpayOrderId: json['razorpayOrderId'],
+      paymentStatus: json['paymentStatus'] ?? 'pending',
+      scheduledTime: json['scheduledTime'] ?? '',
+      address: json['address'],
+      city: json['city'],
+      technicianId: json['technicianId'],
+      technicianName: json['technicianName'],
+      notes: json['notes'],
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'])
+          : DateTime.now(),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'])
+          : DateTime.now(),
+    );
+  }
 
   BookingModel copyWith({
     String? id,
     String? userId,
     String? userName,
     String? userPhone,
-    String? technicianId,
-    String? technicianName,
     String? service,
     String? status,
-    double? earnings,
+    double? serviceCharge,
+    double? visitingCharge,
+    double? taxableAmount,
+    double? gstAmount,
+    double? totalAmount,
+    String? paymentId,
+    String? razorpayOrderId,
+    String? paymentStatus,
     String? scheduledTime,
     String? address,
-    String? notes,
-    double? latitude,
-    double? longitude,
-    String? area,
     String? city,
-    String? pincode,
+    String? technicianId,
+    String? technicianName,
+    String? notes,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -119,19 +137,22 @@ class BookingModel {
       userId: userId ?? this.userId,
       userName: userName ?? this.userName,
       userPhone: userPhone ?? this.userPhone,
-      technicianId: technicianId ?? this.technicianId,
-      technicianName: technicianName ?? this.technicianName,
       service: service ?? this.service,
       status: status ?? this.status,
-      earnings: earnings ?? this.earnings,
+      serviceCharge: serviceCharge ?? this.serviceCharge,
+      visitingCharge: visitingCharge ?? this.visitingCharge,
+      taxableAmount: taxableAmount ?? this.taxableAmount,
+      gstAmount: gstAmount ?? this.gstAmount,
+      totalAmount: totalAmount ?? this.totalAmount,
+      paymentId: paymentId ?? this.paymentId,
+      razorpayOrderId: razorpayOrderId ?? this.razorpayOrderId,
+      paymentStatus: paymentStatus ?? this.paymentStatus,
       scheduledTime: scheduledTime ?? this.scheduledTime,
       address: address ?? this.address,
-      notes: notes ?? this.notes,
-      latitude: latitude ?? this.latitude,
-      longitude: longitude ?? this.longitude,
-      area: area ?? this.area,
       city: city ?? this.city,
-      pincode: pincode ?? this.pincode,
+      technicianId: technicianId ?? this.technicianId,
+      technicianName: technicianName ?? this.technicianName,
+      notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

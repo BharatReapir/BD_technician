@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../services/wallet_service.dart';
+import '../services/tech_payment_service.dart';
 import '../models/wallet_transaction_model.dart';
 import 'package:intl/intl.dart';
 
@@ -16,15 +18,99 @@ class TechWalletPage extends StatefulWidget {
 class _TechWalletPageState extends State<TechWalletPage> {
   final WalletService _walletService = WalletService();
   final TextEditingController _amountController = TextEditingController();
+  late Razorpay _razorpay;
   bool _isLoading = false;
+
+  static const String RAZORPAY_KEY = 'rzp_test_S4yQ9pfJFZGHEV'; // Replace with your key
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
 
   @override
   void dispose() {
+    _razorpay.clear();
     _amountController.dispose();
     super.dispose();
   }
 
-  Future<void> _rechargeWallet() async {
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    debugPrint('✅ Payment Success');
+    debugPrint('Order ID: ${response.orderId}');
+    debugPrint('Payment ID: ${response.paymentId}');
+    debugPrint('Signature: ${response.signature}');
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Verify payment on backend
+      await TechPaymentService.verifyWalletPayment(
+        razorpayOrderId: response.orderId!,
+        razorpayPaymentId: response.paymentId!,
+        razorpaySignature: response.signature!,
+        technicianId: widget.technicianId,
+      );
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Wallet recharged successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Verification failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    debugPrint('❌ Payment Failed');
+    debugPrint('Code: ${response.code}');
+    debugPrint('Message: ${response.message}');
+
+    setState(() {
+      _isLoading = false;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment Failed: ${response.message}'),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    debugPrint('External Wallet: ${response.walletName}');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('External Wallet: ${response.walletName}')),
+    );
+  }
+
+  Future<void> _initiatePayment() async {
     double? amount = double.tryParse(_amountController.text);
 
     if (amount == null || amount < 100) {
@@ -41,27 +127,43 @@ class _TechWalletPageState extends State<TechWalletPage> {
       _isLoading = true;
     });
 
-    bool success =
-        await _walletService.rechargeWallet(widget.technicianId, amount);
+    try {
+      // Create order on backend
+      final orderData = await TechPaymentService.createWalletRechargeOrder(
+        technicianId: widget.technicianId,
+        amount: amount,
+      );
 
-    setState(() {
-      _isLoading = false;
-    });
+      var options = {
+        'key': RAZORPAY_KEY,
+        'amount': (amount * 100).toInt(), // Amount in paise
+        'order_id': orderData['orderId'],
+        'name': 'Wallet Recharge',
+        'description': 'Recharge your technician wallet',
+        'prefill': {
+          'contact': '', // Add technician phone if available
+          'email': '', // Add technician email if available
+        },
+        'theme': {
+          'color': '#00A86B',
+        },
+      };
 
-    if (success) {
+      _razorpay.open(options);
       _amountController.clear();
-      Navigator.pop(context);
+      Navigator.pop(context); // Close dialog
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-              'Wallet recharged successfully with ₹${amount.toStringAsFixed(0)}'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Recharge failed. Please try again.'),
+          content: Text('Error: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -108,7 +210,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: _isLoading ? null : _rechargeWallet,
+            onPressed: _isLoading ? null : _initiatePayment,
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
@@ -122,7 +224,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
                       color: Colors.white,
                     ),
                   )
-                : const Text('Recharge'),
+                : const Text('Pay Now'),
           ),
         ],
       ),
@@ -436,31 +538,39 @@ class _TechWalletPageState extends State<TechWalletPage> {
                           },
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 56,
-                          child: ElevatedButton(
-                            onPressed: _showRechargeDialog,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                      if (_isLoading)
+                        const Padding(
+                          padding: EdgeInsets.all(24.0),
+                          child: Center(
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: ElevatedButton(
+                              onPressed: _showRechargeDialog,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                elevation: 4,
                               ),
-                              elevation: 4,
-                            ),
-                            child: const Text(
-                              'Recharge Wallet',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
+                              child: const Text(
+                                'Recharge Wallet',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),

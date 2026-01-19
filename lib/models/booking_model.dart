@@ -47,6 +47,9 @@ class BookingModel {
     required this.updatedAt,
   });
 
+  // ✅ FIX: Return totalAmount instead of null
+  double get earnings => totalAmount;
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -105,8 +108,6 @@ class BookingModel {
           : DateTime.now(),
     );
   }
-
-  get earnings => null;
 
   // ✅ Helper method to safely convert any number type to double
   static double _toDouble(dynamic value) {

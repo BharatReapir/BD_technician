@@ -1,4 +1,3 @@
-
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const Razorpay = require('razorpay');
@@ -6,12 +5,12 @@ const crypto = require('crypto');
 
 admin.initializeApp();
 
-// 🔐 Razorpay Credentials (NEVER expose these on frontend)
 const razorpay = new Razorpay({
   key_id: 'rzp_test_S4yQ9pfJFZGHEV',
-  key_secret: 'EsC4rFfueWpQPCIadNlR7kKR', // ⚠️ KEEP THIS SECRET!
+  key_secret: 'EsC4rFfueWpQPCIadNlR7kKR', 
 });
 
+// ==================== USER BOOKING PAYMENT ====================
 exports.createRazorpayOrder = functions.https.onRequest(async (req, res) => {
   // Enable CORS
   res.set('Access-Control-Allow-Origin', '*');
@@ -94,7 +93,6 @@ exports.createRazorpayOrder = functions.https.onRequest(async (req, res) => {
   }
 });
 
-// ==================== VERIFY PAYMENT ====================
 exports.verifyPayment = functions.https.onRequest(async (req, res) => {
   // Enable CORS
   res.set('Access-Control-Allow-Origin', '*');
@@ -181,7 +179,6 @@ exports.verifyPayment = functions.https.onRequest(async (req, res) => {
   }
 });
 
-// ==================== GET PAYMENT DETAILS (Optional) ====================
 exports.getPaymentDetails = functions.https.onRequest(async (req, res) => {
   res.set('Access-Control-Allow-Origin', '*');
 
@@ -211,5 +208,154 @@ exports.getPaymentDetails = functions.https.onRequest(async (req, res) => {
       error: 'Failed to fetch payment details',
       details: error.message,
     });
+  }
+});
+
+// ==================== TECHNICIAN WALLET RECHARGE ====================
+exports.createWalletRechargeOrder = functions.https.onRequest(async (req, res) => {
+  // Enable CORS
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  try {
+    const {technicianId, amount} = req.body;
+
+    console.log('📥 Creating wallet recharge order:', {technicianId, amount});
+
+    if (!technicianId || !amount) {
+      res.status(400).json({error: 'Missing required fields'});
+      return;
+    }
+
+    if (amount < 100) {
+      res.status(400).json({error: 'Minimum recharge amount is ₹100'});
+      return;
+    }
+
+    // Create Razorpay order
+    const options = {
+      amount: Math.round(amount * 100), // Amount in paise
+      currency: 'INR',
+      receipt: `wallet_${technicianId}_${Date.now()}`,
+      notes: {
+        technicianId: technicianId,
+        type: 'wallet_recharge',
+      },
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    console.log('✅ Razorpay wallet order created:', order.id);
+
+    res.status(200).json({
+      orderId: order.id,
+      amount: amount,
+      currency: 'INR',
+      technicianId: technicianId,
+    });
+  } catch (error) {
+    console.error('❌ Error creating wallet order:', error);
+    res.status(500).json({error: error.message});
+  }
+});
+
+exports.verifyWalletPayment = functions.https.onRequest(async (req, res) => {
+  // Enable CORS
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
+  }
+
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      technicianId,
+    } = req.body;
+
+    console.log('🔐 Verifying wallet payment:', {
+      razorpay_order_id,
+      razorpay_payment_id,
+      technicianId,
+    });
+
+    if (!razorpay_order_id || !razorpay_payment_id || 
+        !razorpay_signature || !technicianId) {
+      res.status(400).json({error: 'Missing required fields'});
+      return;
+    }
+
+    // 🔒 CRITICAL: Verify signature
+    const generatedSignature = crypto
+        .createHmac('sha256', razorpay.key_secret)
+        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+        .digest('hex');
+
+    if (generatedSignature !== razorpay_signature) {
+      console.error('❌ Invalid wallet payment signature');
+      res.status(400).json({error: 'Invalid payment signature'});
+      return;
+    }
+
+    console.log('✅ Wallet payment signature verified');
+
+    // Fetch payment details from Razorpay
+    const payment = await razorpay.payments.fetch(razorpay_payment_id);
+
+    if (payment.status !== 'captured') {
+      res.status(400).json({error: 'Payment not captured'});
+      return;
+    }
+
+    const amount = payment.amount / 100; // Convert paise to rupees
+
+    // Get current balance
+    const techRef = admin.database()
+        .ref(`technicians/${technicianId}`);
+    const snapshot = await techRef.child('walletBalance').get();
+
+    const currentBalance = snapshot.exists() ? snapshot.val() : 0;
+    const newBalance = currentBalance + amount;
+
+    // Update wallet balance
+    await techRef.update({
+      walletBalance: newBalance,
+      updatedAt: Date.now(),
+    });
+
+    // Save transaction
+    await admin.database().ref('wallet_transactions').push({
+      technicianId: technicianId,
+      amount: amount,
+      type: 'credit',
+      description: 'Wallet recharge via Razorpay',
+      balanceAfter: newBalance,
+      timestamp: Date.now(),
+      paymentId: razorpay_payment_id,
+      orderId: razorpay_order_id,
+    });
+
+    console.log(`✅ Wallet updated: ${currentBalance} → ${newBalance}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment verified and wallet updated',
+      newBalance: newBalance,
+      amountAdded: amount,
+    });
+  } catch (error) {
+    console.error('❌ Error verifying wallet payment:', error);
+    res.status(500).json({error: error.message});
   }
 });

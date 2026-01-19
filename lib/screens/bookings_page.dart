@@ -354,13 +354,13 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
             const SizedBox(height: 8),
           ],
           
-          // Price
+          // Price - FIXED HERE
           Row(
             children: [
               const Icon(Icons.currency_rupee, size: 16, color: AppColors.textGray),
               const SizedBox(width: 6),
               Text(
-                '₹${booking.earnings.toStringAsFixed(0)}',
+                '₹${(booking.earnings ?? 0).toStringAsFixed(0)}',
                 style: const TextStyle(
                   fontSize: 16,
                   color: AppColors.primary,
@@ -542,7 +542,7 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
                 _buildDetailRow('Address', booking.address!),
               if (booking.technicianName != null)
                 _buildDetailRow('Technician', booking.technicianName!),
-              _buildDetailRow('Amount', '₹${booking.earnings.toStringAsFixed(0)}'),
+              _buildDetailRow('Amount', '₹${(booking.earnings ?? 0).toStringAsFixed(0)}'), // FIXED HERE
               if (booking.notes != null)
                 _buildDetailRow('Notes', booking.notes!),
               _buildDetailRow('Booked On', _formatDateTime(booking.createdAt)),

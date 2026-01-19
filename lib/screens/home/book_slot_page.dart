@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../constants/colors.dart';
 import 'checkout_page.dart';
 
@@ -36,23 +37,106 @@ class _BookSlotPageState extends State<BookSlotPage> {
     },
   ];
 
-  final List<Map<String, String>> dates = [
-    {'day': 'Today', 'date': '12 Dec'},
-    {'day': 'Tomorrow', 'date': '13 Dec'},
-    {'day': 'Sat', 'date': '14 Dec'},
-    {'day': 'Sun', 'date': '15 Dec'},
-    {'day': 'Mon', 'date': '16 Dec'},
-  ];
+  // ✅ Generate dynamic dates
+  late final List<Map<String, dynamic>> dates;
 
   final List<String> timeSlots = [
     '09:00 AM - 11:00 AM',
     '11:00 AM - 01:00 PM',
     '01:00 PM - 03:00 PM',
     '03:00 PM - 05:00 PM',
+    '05:00 PM - 07:00 PM',
+    '07:00 PM - 09:00 PM',
   ];
 
   @override
+  void initState() {
+    super.initState();
+    dates = _generateDates();
+  }
+
+  // ✅ Generate next 7 days starting from today
+  List<Map<String, dynamic>> _generateDates() {
+    final List<Map<String, dynamic>> dateList = [];
+    final now = DateTime.now();
+
+    for (int i = 0; i < 7; i++) {
+      final date = now.add(Duration(days: i));
+      String dayLabel;
+
+      if (i == 0) {
+        dayLabel = 'Today';
+      } else if (i == 1) {
+        dayLabel = 'Tomorrow';
+      } else {
+        dayLabel = DateFormat('EEE').format(date); // Mon, Tue, Wed, etc.
+      }
+
+      dateList.add({
+        'day': dayLabel,
+        'date': DateFormat('dd MMM').format(date), // 12 Dec
+        'fullDate': DateFormat('dd/MM/yyyy').format(date), // 12/12/2024
+        'dateTime': date, // DateTime object for reference
+      });
+    }
+
+    return dateList;
+  }
+
+  // ✅ Filter time slots based on selected date
+  List<String> _getAvailableTimeSlots() {
+    final selectedDate = dates[selectedDateIndex]['dateTime'] as DateTime;
+    final now = DateTime.now();
+
+    // If selected date is today, filter out past time slots
+    if (selectedDate.year == now.year &&
+        selectedDate.month == now.month &&
+        selectedDate.day == now.day) {
+      return timeSlots.where((slot) {
+        final slotStartTime = _parseTimeSlot(slot);
+        final slotDateTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          slotStartTime.hour,
+          slotStartTime.minute,
+        );
+        // Only show slots that are at least 2 hours in the future
+        return slotDateTime.isAfter(now.add(const Duration(hours: 2)));
+      }).toList();
+    }
+
+    // For future dates, show all slots
+    return timeSlots;
+  }
+
+  // ✅ Parse time slot string to TimeOfDay
+  TimeOfDay _parseTimeSlot(String slot) {
+    final startTime = slot.split(' - ')[0].trim();
+    final parts = startTime.split(' ');
+    final time = parts[0].split(':');
+    int hour = int.parse(time[0]);
+    final minute = int.parse(time[1]);
+    final period = parts[1];
+
+    if (period == 'PM' && hour != 12) {
+      hour += 12;
+    } else if (period == 'AM' && hour == 12) {
+      hour = 0;
+    }
+
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final availableTimeSlots = _getAvailableTimeSlots();
+    
+    // Reset time slot selection if current selection is not available
+    if (selectedTimeSlotIndex >= availableTimeSlots.length) {
+      selectedTimeSlotIndex = -1;
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -225,6 +309,7 @@ class _BookSlotPageState extends State<BookSlotPage> {
                           onTap: () {
                             setState(() {
                               selectedDateIndex = index;
+                              selectedTimeSlotIndex = -1; // Reset time slot when date changes
                             });
                           },
                           child: Container(
@@ -284,47 +369,61 @@ class _BookSlotPageState extends State<BookSlotPage> {
                   ),
                   
                   // Time Slots
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 2.5,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                    ),
-                    itemCount: timeSlots.length,
-                    itemBuilder: (context, index) {
-                      final isSelected = selectedTimeSlotIndex == index;
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            selectedTimeSlotIndex = index;
-                          });
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: isSelected ? AppColors.primary : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isSelected ? AppColors.primary : AppColors.bgMedium,
-                            ),
-                          ),
+                  availableTimeSlots.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(16.0),
                           child: Center(
                             child: Text(
-                              timeSlots[index],
+                              'No available slots for today. Please select another date.',
                               style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                color: isSelected ? Colors.white : AppColors.textDark,
+                                fontSize: 14,
+                                color: AppColors.textGray,
                               ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
+                        )
+                      : GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            childAspectRatio: 2.5,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                          ),
+                          itemCount: availableTimeSlots.length,
+                          itemBuilder: (context, index) {
+                            final isSelected = selectedTimeSlotIndex == index;
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  selectedTimeSlotIndex = index;
+                                });
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: isSelected ? AppColors.primary : Colors.white,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isSelected ? AppColors.primary : AppColors.bgMedium,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    availableTimeSlots[index],
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      color: isSelected ? Colors.white : AppColors.textDark,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
                   const SizedBox(height: 100),
                 ],
               ),
@@ -347,7 +446,7 @@ class _BookSlotPageState extends State<BookSlotPage> {
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: selectedTimeSlotIndex == -1
+                onPressed: selectedTimeSlotIndex == -1 || availableTimeSlots.isEmpty
                     ? null
                     : () {
                         Navigator.push(
@@ -358,7 +457,7 @@ class _BookSlotPageState extends State<BookSlotPage> {
                               price: widget.price,
                               basePrice: widget.basePrice,
                               date: dates[selectedDateIndex]['date']!,
-                              timeSlot: timeSlots[selectedTimeSlotIndex],
+                              timeSlot: availableTimeSlots[selectedTimeSlotIndex],
                               address: addresses[selectedAddressIndex],
                             ),
                           ),

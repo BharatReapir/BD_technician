@@ -5,9 +5,10 @@ const crypto = require('crypto');
 
 admin.initializeApp();
 
+// 🔐 Razorpay Credentials (NEVER expose these on frontend)
 const razorpay = new Razorpay({
   key_id: 'rzp_test_S4yQ9pfJFZGHEV',
-  key_secret: 'EsC4rFfueWpQPCIadNlR7kKR', 
+  key_secret: 'EsC4rFfueWpQPCIadNlR7kKR',
 });
 
 // ==================== USER BOOKING PAYMENT ====================

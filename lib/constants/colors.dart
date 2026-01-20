@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const Color primary = Color(0xFF00A651);
-  static const Color secondary = Color(0xFF009B89);
-  static const Color tertiary = Color(0xFF0E7490);
-  static const Color lightGreen = Color(0xFF86EFAC);
-  
-  static const Color textDark = Color(0xFF1F2937);
-  static const Color textMedium = Color(0xFF374151);
-  static const Color textLight = Color(0xFF6B7280);
-  static const Color textGray = Color(0xFF9CA3AF);
-  
-  static const Color bgLight = Color(0xFFF9FAFB);
-  static const Color bgMedium = Color(0xFFF3F4F6);
-  
-  static const Color serviceBg1 = Color(0xFFDCFCE7);
-  static const Color serviceBg2 = Color(0xFFDBEAFE);
-  static const Color serviceBg3 = Color(0xFFD1FAE5);
+  // Pastel reds and white theme
+  static const Color primary = Color(0xFFEB4D4B); // Main pastel red
+  static const Color secondary = Color(0xFFFF7979); // Lighter pastel red
+  static const Color tertiary = Color(0xFFFFAFAF); // Even lighter pastel red
+  static const Color accent = Color(0xFFFF6F61); // Accent pastel red
+
+  static const Color textDark = Color(0xFFB71C1C); // Deep red for text
+  static const Color textMedium = Color(0xFFD32F2F); // Medium red
+  static const Color textLight = Color(0xFFFA8072); // Light red
+  static const Color textGray = Color(0xFFBDBDBD); // Soft gray for contrast
+
+  static const Color bgLight = Color(0xFFFAF7F2); // Main background
+  static const Color bgMedium = Color(0xFFFFE5E5); // Light pastel red background
+
+  static const Color serviceBg1 = Color(0xFFFFE5E5); // Pastel red background
+  static const Color serviceBg2 = Color(0xFFFFF0F0); // Lighter pastel red background
+  static const Color serviceBg3 = Color(0xFFFFFFFF);
+
+  static Color? get lightGreen => null; // White background
 }

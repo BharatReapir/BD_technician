@@ -1,3 +1,4 @@
+import 'package:bharatapp/constants/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -31,8 +32,42 @@ class BharatDoorstepApp extends StatelessWidget {
         title: 'Bharat Doorstep',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          primarySwatch: Colors.green,
           fontFamily: 'Roboto',
+          scaffoldBackgroundColor: AppColors.bgLight,
+          primaryColor: AppColors.primary,
+          colorScheme: ColorScheme.fromSwatch().copyWith(
+            primary: AppColors.primary,
+            secondary: AppColors.secondary,
+            background: AppColors.bgLight,
+            surface: AppColors.bgMedium,
+            error: AppColors.primary,
+            onPrimary: Colors.white,
+            onSecondary: Colors.white,
+            onBackground: AppColors.textDark,
+            onSurface: AppColors.textDark,
+            onError: Colors.white,
+            brightness: Brightness.light,
+          ),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(16)),
+              ),
+            ),
+          ),
+          textTheme: const TextTheme(
+            displayLarge: TextStyle(color: AppColors.textDark),
+            displayMedium: TextStyle(color: AppColors.textDark),
+            bodyLarge: TextStyle(color: AppColors.textMedium),
+            bodyMedium: TextStyle(color: AppColors.textLight),
+          ),
         ),
         home: const AuthChecker(),
       ),

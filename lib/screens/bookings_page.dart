@@ -68,7 +68,7 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to load bookings: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.primary,
             action: SnackBarAction(
               label: 'Retry',
               textColor: Colors.white,

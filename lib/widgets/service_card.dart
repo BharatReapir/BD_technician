@@ -18,7 +18,7 @@ class ServiceCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: AppColors.bgMedium,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(

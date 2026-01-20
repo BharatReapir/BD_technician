@@ -1,3 +1,4 @@
+import 'package:bharatapp/constants/colors.dart';
 import 'package:flutter/material.dart';
 
 class OfferCard extends StatelessWidget {
@@ -23,7 +24,7 @@ class OfferCard extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [startColor, endColor],
+          colors: [AppColors.primary, AppColors.secondary],
         ),
         borderRadius: BorderRadius.circular(16),
       ),

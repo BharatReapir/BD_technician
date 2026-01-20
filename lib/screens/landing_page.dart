@@ -53,9 +53,10 @@ class _LandingPageState extends State<LandingPage>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              AppColors.primary,
-              AppColors.secondary,
-              AppColors.tertiary,
+              Color(0xFFEB4D4B), // dark pastel red
+              Color(0xFFFF7979), // medium pastel red
+              Color(0xFFFFAFAF), // light pastel red
+              Color(0xFFFAF7F2), // white background
             ],
           ),
         ),
@@ -90,6 +91,7 @@ class _LandingPageState extends State<LandingPage>
                   position: _slideAnimation,
                   child: Column(
                     children: [
+                      // Logo placeholder: Replace with your logo widget/image
                       Container(
                         width: 140,
                         height: 140,
@@ -98,41 +100,20 @@ class _LandingPageState extends State<LandingPage>
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
+                              color: Colors.red.withOpacity(0.15),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
                           ],
                         ),
-                        child: Stack(
-                          children: [
-                            Center(
-                              child: Icon(
-                                Icons.shield,
-                                size: 80,
-                                color: Colors.green[700],
-                              ),
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Image.asset(
+                              'assets/logo.png', // Place your logo here
+                              fit: BoxFit.contain,
                             ),
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.tertiary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Text(
-                                  'BD',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 30),
@@ -142,6 +123,7 @@ class _LandingPageState extends State<LandingPage>
                           color: Colors.white,
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
                         ),
                       ),
                       const SizedBox(height: 10),
@@ -150,6 +132,7 @@ class _LandingPageState extends State<LandingPage>
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ],
@@ -213,7 +196,7 @@ class _LandingPageState extends State<LandingPage>
         child: Text(
           text,
           style: TextStyle(
-            color: Colors.white,
+            color: isActive ? Colors.white : AppColors.primary,
             fontSize: 14,
             fontWeight:
                 isActive ? FontWeight.bold : FontWeight.normal,

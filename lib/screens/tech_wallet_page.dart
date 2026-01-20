@@ -1,3 +1,4 @@
+import 'package:bharatapp/constants/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
@@ -21,7 +22,8 @@ class _TechWalletPageState extends State<TechWalletPage> {
   late Razorpay _razorpay;
   bool _isLoading = false;
 
-  static const String RAZORPAY_KEY = 'rzp_test_S4yQ9pfJFZGHEV'; // Replace with your key
+  // ⚠️ REPLACE WITH YOUR ACTUAL RAZORPAY KEY
+  static const String RAZORPAY_KEY = 'rzp_test_S4yQ9pfJFZGHEV';
 
   @override
   void initState() {
@@ -30,6 +32,9 @@ class _TechWalletPageState extends State<TechWalletPage> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+    
+    // Debug: Print technician ID
+    debugPrint('🔍 Technician ID: ${widget.technicianId}');
   }
 
   @override
@@ -50,7 +55,6 @@ class _TechWalletPageState extends State<TechWalletPage> {
     });
 
     try {
-      // Verify payment on backend
       await TechPaymentService.verifyWalletPayment(
         razorpayOrderId: response.orderId!,
         razorpayPaymentId: response.paymentId!,
@@ -66,7 +70,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ Wallet recharged successfully!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.primary,
           ),
         );
       }
@@ -80,6 +84,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
           SnackBar(
             content: Text('❌ Verification failed: $e'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }
@@ -95,31 +100,46 @@ class _TechWalletPageState extends State<TechWalletPage> {
       _isLoading = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Payment Failed: ${response.message}'),
-        backgroundColor: Colors.red,
-      ),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment Failed: ${response.message}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
   }
 
   void _handleExternalWallet(ExternalWalletResponse response) {
     debugPrint('External Wallet: ${response.walletName}');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('External Wallet: ${response.walletName}')),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('External Wallet: ${response.walletName}')),
+      );
+    }
   }
 
   Future<void> _initiatePayment() async {
-    double? amount = double.tryParse(_amountController.text);
+    final amountText = _amountController.text.trim();
+    
+    debugPrint('🔍 Initiating payment...');
+    debugPrint('Amount text: "$amountText"');
+    
+    if (amountText.isEmpty) {
+      _showError('Please enter an amount');
+      return;
+    }
 
-    if (amount == null || amount < 100) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter minimum ₹100'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    double? amount = double.tryParse(amountText);
+    
+    if (amount == null) {
+      _showError('Invalid amount entered');
+      return;
+    }
+
+    if (amount < 100) {
+      _showError('Minimum recharge amount is ₹100');
       return;
     }
 
@@ -128,11 +148,21 @@ class _TechWalletPageState extends State<TechWalletPage> {
     });
 
     try {
+      debugPrint('📤 Creating order for ₹$amount');
+      debugPrint('📤 Technician ID: ${widget.technicianId}');
+      
       // Create order on backend
       final orderData = await TechPaymentService.createWalletRechargeOrder(
         technicianId: widget.technicianId,
         amount: amount,
       );
+
+      debugPrint('📥 Order data received: $orderData');
+
+      // Check if orderId exists
+      if (!orderData.containsKey('orderId') || orderData['orderId'] == null) {
+        throw Exception('Order ID not received from server');
+      }
 
       var options = {
         'key': RAZORPAY_KEY,
@@ -141,36 +171,52 @@ class _TechWalletPageState extends State<TechWalletPage> {
         'name': 'Wallet Recharge',
         'description': 'Recharge your technician wallet',
         'prefill': {
-          'contact': '', // Add technician phone if available
-          'email': '', // Add technician email if available
+          'contact': '',
+          'email': '',
         },
         'theme': {
-          'color': '#00A86B',
+          'color': '#EB4D4B',
         },
       };
 
+      debugPrint('🚀 Opening Razorpay with options: $options');
+
       _razorpay.open(options);
       _amountController.clear();
-      Navigator.pop(context); // Close dialog
+      
+      if (mounted) {
+        Navigator.pop(context); // Close dialog
+      }
 
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('❌ Error in _initiatePayment: $e');
+      
       setState(() {
         _isLoading = false;
       });
 
+      _showError('Failed to create order: $e');
+    }
+  }
+
+  void _showError(String message) {
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: $e'),
+          content: Text(message),
           backgroundColor: Colors.red,
+          duration: const Duration(seconds: 5),
         ),
       );
     }
   }
 
   void _showRechargeDialog() {
+    _amountController.clear(); // Clear before showing
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -188,6 +234,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
+                hintText: 'Enter amount',
               ),
             ),
             const SizedBox(height: 16),
@@ -198,6 +245,14 @@ class _TechWalletPageState extends State<TechWalletPage> {
                 _buildQuickAmountButton(1000),
                 _buildQuickAmountButton(2000),
               ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Minimum: ₹100',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
             ),
           ],
         ),
@@ -212,7 +267,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
           ElevatedButton(
             onPressed: _isLoading ? null : _initiatePayment,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
             ),
             child: _isLoading
@@ -252,8 +307,9 @@ class _TechWalletPageState extends State<TechWalletPage> {
             begin: Alignment.topCenter,
             end: Alignment.center,
             colors: [
-              Color(0xFF00A86B),
-              Color(0xFF00C853),
+              AppColors.primary,
+              AppColors.secondary,
+              AppColors.tertiary,
             ],
           ),
         ),
@@ -315,27 +371,27 @@ class _TechWalletPageState extends State<TechWalletPage> {
                           style: const TextStyle(
                             fontSize: 48,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF00A86B),
+                            color: AppColors.primary,
                           ),
                         ),
                         const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
+                            color: AppColors.bgMedium,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             children: [
                               const Icon(Icons.info_outline,
-                                  color: Colors.blue, size: 20),
+                                  color: AppColors.secondary, size: 20),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   '₹200 deducted per booking acceptance',
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.blue.shade700,
+                                    color: AppColors.secondary,
                                   ),
                                 ),
                               ),
@@ -375,21 +431,21 @@ class _TechWalletPageState extends State<TechWalletPage> {
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
+                            color: AppColors.bgMedium,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Icon(Icons.lightbulb_outline,
-                                  color: Colors.blue),
+                                  color: AppColors.secondary),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   'Recharge your wallet and ₹200 will be deducted each time you accept a booking.',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.blue.shade900,
+                                    color: AppColors.primary,
                                   ),
                                 ),
                               ),
@@ -403,21 +459,21 @@ class _TechWalletPageState extends State<TechWalletPage> {
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
+                            color: AppColors.bgMedium,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const Icon(Icons.warning_amber_rounded,
-                                  color: Colors.orange),
+                                  color: AppColors.primary),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   'Ensure sufficient balance to accept bookings. Low balance will prevent accepting new jobs.',
                                   style: TextStyle(
                                     fontSize: 14,
-                                    color: Colors.orange.shade900,
+                                    color: AppColors.primary,
                                   ),
                                 ),
                               ),
@@ -470,10 +526,10 @@ class _TechWalletPageState extends State<TechWalletPage> {
                                   margin: const EdgeInsets.only(bottom: 12),
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
+                                    color: AppColors.bgMedium,
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: Colors.grey.shade200,
+                                      color: AppColors.bgLight,
                                     ),
                                   ),
                                   child: Row(
@@ -481,18 +537,18 @@ class _TechWalletPageState extends State<TechWalletPage> {
                                       Container(
                                         padding: const EdgeInsets.all(10),
                                         decoration: BoxDecoration(
-                                          color: isCredit
-                                              ? Colors.green.shade100
-                                              : Colors.red.shade100,
+                                            color: isCredit
+                                              ? AppColors.secondary.withOpacity(0.2)
+                                              : AppColors.primary.withOpacity(0.2),
                                           shape: BoxShape.circle,
                                         ),
                                         child: Icon(
                                           isCredit
-                                              ? Icons.add
-                                              : Icons.remove,
+                                            ? Icons.add
+                                            : Icons.remove,
                                           color: isCredit
-                                              ? Colors.green
-                                              : Colors.red,
+                                            ? AppColors.secondary
+                                            : AppColors.primary,
                                         ),
                                       ),
                                       const SizedBox(width: 16),
@@ -513,7 +569,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
                                               DateFormat('dd MMM yyyy, hh:mm a')
                                                   .format(transaction.timestamp),
                                               style: TextStyle(
-                                                color: Colors.grey.shade600,
+                                                color: AppColors.textGray,
                                                 fontSize: 12,
                                               ),
                                             ),
@@ -526,8 +582,8 @@ class _TechWalletPageState extends State<TechWalletPage> {
                                           fontWeight: FontWeight.bold,
                                           fontSize: 16,
                                           color: isCredit
-                                              ? Colors.green
-                                              : Colors.red,
+                                              ? AppColors.secondary
+                                              : AppColors.primary,
                                         ),
                                       ),
                                     ],
@@ -554,7 +610,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
                             child: ElevatedButton(
                               onPressed: _showRechargeDialog,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
+                                backgroundColor: AppColors.primary,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),

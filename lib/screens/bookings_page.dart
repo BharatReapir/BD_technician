@@ -5,6 +5,7 @@ import '../constants/colors.dart';
 import '../models/booking_model.dart';
 import '../services/firebase_service.dart';
 import '../providers/auth_provider.dart' as auth_provider;
+import '../providers/coin_provider.dart';
 
 class BookingsPage extends StatefulWidget {
   const BookingsPage({Key? key}) : super(key: key);
@@ -57,6 +58,10 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
         _allBookings = bookings;
         _isLoading = false;
       });
+
+      // Credit coins for completed bookings
+      await _creditCoinsForCompletedBookings();
+      
     } catch (e, stackTrace) {
       debugPrint('❌ Error loading bookings: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -78,6 +83,38 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
         );
       }
     }
+  }
+
+  Future<void> _creditCoinsForCompletedBookings() async {
+    if (!mounted) return;
+
+    try {
+      final coinProvider = context.read<CoinProvider>();
+
+      for (final booking in _allBookings) {
+        if (booking.status == 'completed') {
+          final coins = _calculateCoins(booking.totalAmount);
+
+          debugPrint('💰 Attempting to credit $coins coins for booking ${booking.id}');
+
+          await coinProvider.creditCoins(
+            bookingId: booking.id,
+            coins: coins,
+            bookingNumber: 1, // You can track this separately if needed
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error crediting coins: $e');
+    }
+  }
+
+  int _calculateCoins(double amount) {
+    if (amount >= 900) return 50;
+    if (amount >= 700) return 40;
+    if (amount >= 500) return 30;
+    if (amount >= 300) return 20;
+    return 10;
   }
 
   List<BookingModel> _getUpcomingBookings() {
@@ -354,21 +391,57 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
             const SizedBox(height: 8),
           ],
           
-          // Price - FIXED HERE
+          // Price & Payment Status
           Row(
             children: [
               const Icon(Icons.currency_rupee, size: 16, color: AppColors.textGray),
               const SizedBox(width: 6),
               Text(
-                '₹${(booking.earnings ?? 0).toStringAsFixed(0)}',
+                '₹${booking.totalAmount.toStringAsFixed(2)}',
                 style: const TextStyle(
                   fontSize: 16,
                   color: AppColors.primary,
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(width: 8),
+              if (booking.paymentStatus == 'paid')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'PAID',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
             ],
           ),
+
+          // Show coin savings if used
+          if (booking.coinsUsed != null && booking.coinsUsed! > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.discount, size: 14, color: Colors.green),
+                const SizedBox(width: 6),
+                Text(
+                  '${booking.coinsUsed} coins used • Saved ₹${(booking.coinDiscount ?? 0).toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.green,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ],
           
           // Notes
           if (booking.notes != null && booking.notes!.isNotEmpty) ...[
@@ -538,11 +611,48 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
               _buildDetailRow('Booking ID', booking.id.substring(0, 12).toUpperCase()),
               _buildDetailRow('Status', booking.status.toUpperCase()),
               _buildDetailRow('Date & Time', booking.scheduledTime),
+              
+              const Divider(height: 32),
+              
+              // Payment Breakdown
+              const Text(
+                'Payment Breakdown',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textDark,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              _buildDetailRow('Service Charge', '₹${booking.serviceCharge.toStringAsFixed(2)}'),
+              _buildDetailRow('Visiting Charge', '₹${booking.visitingCharge.toStringAsFixed(2)}'),
+              
+              if (booking.coinsUsed != null && booking.coinsUsed! > 0)
+                _buildDetailRow(
+                  'Coin Discount (${booking.coinsUsed} coins)',
+                  '- ₹${(booking.coinDiscount ?? 0).toStringAsFixed(2)}',
+                  valueColor: Colors.green,
+                ),
+              
+              const Divider(height: 24),
+              _buildDetailRow('Taxable Amount', '₹${booking.taxableAmount.toStringAsFixed(2)}'),
+              _buildDetailRow('GST (18%)', '₹${booking.gstAmount.toStringAsFixed(2)}'),
+              const Divider(height: 24),
+              
+              _buildDetailRow(
+                'Total Amount',
+                '₹${booking.totalAmount.toStringAsFixed(2)}',
+                isBold: true,
+              ),
+              _buildDetailRow('Payment Status', booking.paymentStatus.toUpperCase()),
+              
+              const Divider(height: 32),
+              
               if (booking.address != null)
                 _buildDetailRow('Address', booking.address!),
               if (booking.technicianName != null)
                 _buildDetailRow('Technician', booking.technicianName!),
-              _buildDetailRow('Amount', '₹${(booking.earnings ?? 0).toStringAsFixed(0)}'), // FIXED HERE
               if (booking.notes != null)
                 _buildDetailRow('Notes', booking.notes!),
               _buildDetailRow('Booked On', _formatDateTime(booking.createdAt)),
@@ -578,7 +688,7 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
     );
   }
 
-  Widget _buildDetailRow(String label, String value) {
+  Widget _buildDetailRow(String label, String value, {bool isBold = false, Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -598,10 +708,10 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
-                color: AppColors.textDark,
-                fontWeight: FontWeight.w600,
+                color: valueColor ?? AppColors.textDark,
+                fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
               ),
             ),
           ),

@@ -21,6 +21,10 @@ class BookingModel {
   final String? notes;
   final DateTime createdAt;
   final DateTime updatedAt;
+  
+  // ✅ NEW: Coin fields
+  final int? coinsUsed;
+  final double? coinDiscount;
 
   BookingModel({
     required this.id,
@@ -45,9 +49,11 @@ class BookingModel {
     this.notes,
     required this.createdAt,
     required this.updatedAt,
+    // ✅ NEW: Coin parameters
+    this.coinsUsed,
+    this.coinDiscount,
   });
 
-  // ✅ FIX: Return totalAmount instead of null
   double get earnings => totalAmount;
 
   Map<String, dynamic> toJson() {
@@ -74,6 +80,9 @@ class BookingModel {
       'notes': notes,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
+      // ✅ NEW: Coin fields in JSON
+      'coinsUsed': coinsUsed ?? 0,
+      'coinDiscount': coinDiscount ?? 0.0,
     };
   }
 
@@ -85,7 +94,6 @@ class BookingModel {
       userPhone: json['userPhone'] ?? '',
       service: json['service'] ?? '',
       status: json['status'] ?? 'pending',
-      // ✅ FIX: Safe conversion from any number type to double
       serviceCharge: _toDouble(json['serviceCharge']),
       visitingCharge: _toDouble(json['visitingCharge']),
       taxableAmount: _toDouble(json['taxableAmount']),
@@ -106,10 +114,12 @@ class BookingModel {
       updatedAt: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'])
           : DateTime.now(),
+      // ✅ NEW: Parse coin fields
+      coinsUsed: json['coinsUsed'] is int ? json['coinsUsed'] : (json['coinsUsed'] != null ? int.tryParse(json['coinsUsed'].toString()) : 0),
+      coinDiscount: _toDouble(json['coinDiscount']),
     );
   }
 
-  // ✅ Helper method to safely convert any number type to double
   static double _toDouble(dynamic value) {
     if (value == null) return 0.0;
     if (value is double) return value;
@@ -141,6 +151,9 @@ class BookingModel {
     String? notes,
     DateTime? createdAt,
     DateTime? updatedAt,
+    // ✅ NEW: Coin parameters in copyWith
+    int? coinsUsed,
+    double? coinDiscount,
   }) {
     return BookingModel(
       id: id ?? this.id,
@@ -165,6 +178,9 @@ class BookingModel {
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      // ✅ NEW: Coin fields in copyWith
+      coinsUsed: coinsUsed ?? this.coinsUsed,
+      coinDiscount: coinDiscount ?? this.coinDiscount,
     );
   }
 }

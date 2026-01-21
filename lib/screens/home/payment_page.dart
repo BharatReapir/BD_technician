@@ -6,15 +6,19 @@ import '../../constants/colors.dart';
 import '../../models/booking_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/payment_service.dart';
+import '../../services/coin_service.dart'; // ✅ NEW
 import '../../providers/auth_provider.dart' as auth_provider;
 import 'booking_success_page.dart';
 
 class PaymentPage extends StatefulWidget {
   final String serviceName;
-  final double serviceCharge; // Base service price (e.g., ₹1000)
+  final double serviceCharge; // ✅ This already has coin discount applied from checkout
   final String date;
   final String timeSlot;
   final Map<String, String> address;
+  // ✅ NEW: Coin parameters from checkout
+  final int coinsUsed;
+  final double coinDiscount;
 
   const PaymentPage({
     Key? key,
@@ -23,6 +27,8 @@ class PaymentPage extends StatefulWidget {
     required this.date,
     required this.timeSlot,
     required this.address,
+    this.coinsUsed = 0,       // ✅ NEW
+    this.coinDiscount = 0.0,  // ✅ NEW
   }) : super(key: key);
 
   @override
@@ -58,6 +64,8 @@ class _PaymentPageState extends State<PaymentPage> {
     return _selectedArea == 'standard' ? 299.0 : 399.0;
   }
 
+  // ✅ IMPORTANT: serviceCharge already has coin discount applied
+  // So taxableAmount = (serviceCharge - coinDiscount) + visitingCharge
   double get taxableAmount {
     return widget.serviceCharge + visitingCharge;
   }
@@ -92,6 +100,21 @@ class _PaymentPageState extends State<PaymentPage> {
       if (verificationResult['verified'] == true) {
         debugPrint('✅ Payment verified by backend');
 
+        // ✅ NEW: Redeem coins if used
+        if (widget.coinsUsed > 0) {
+          try {
+            await CoinService.redeemCoins(
+              userId: FirebaseAuth.instance.currentUser!.uid,
+              bookingId: _currentBookingId!,
+              coinsToRedeem: widget.coinsUsed,
+            );
+            debugPrint('✅ ${widget.coinsUsed} coins redeemed successfully');
+          } catch (e) {
+            debugPrint('⚠️ Coin redemption error: $e');
+            // Continue with payment success even if coin redemption fails
+          }
+        }
+
         // Update booking status
         await FirebaseService.updateBookingStatus(_currentBookingId!, 'paid');
         await FirebaseService.updateBookingPaymentId(
@@ -103,8 +126,12 @@ class _PaymentPageState extends State<PaymentPage> {
 
         // Show success and navigate
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Payment Successful!'),
+          SnackBar(
+            content: Text(
+              widget.coinsUsed > 0 
+                ? 'Payment Successful! ${widget.coinsUsed} coins redeemed'
+                : 'Payment Successful!',
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -244,9 +271,14 @@ class _PaymentPageState extends State<PaymentPage> {
       scheduledTime: '${widget.date} ${widget.timeSlot}',
       address: '${widget.address['address']}, ${widget.address['city']}',
       city: widget.address['city'],
-      notes: 'Area: $_selectedArea',
+      notes: widget.coinsUsed > 0 
+          ? 'Area: $_selectedArea | Coins: ${widget.coinsUsed}' // ✅ NEW
+          : 'Area: $_selectedArea',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
+      // ✅ NEW: Add coin fields
+      coinsUsed: widget.coinsUsed,
+      coinDiscount: widget.coinDiscount,
     );
 
     return await FirebaseService.createBooking(booking);
@@ -273,12 +305,12 @@ class _PaymentPageState extends State<PaymentPage> {
 
   void _openRazorpayCheckout(Map<String, dynamic> orderData, dynamic userData) {
     var options = {
-      'key': 'rzp_test_S4yQ9pfJFZGHEV', // 🔒 Your Razorpay Test Key
-      'amount': (totalAmount * 100).toInt(), // Amount in paise
+      'key': 'rzp_test_S4yQ9pfJFZGHEV',
+      'amount': (totalAmount * 100).toInt(),
       'currency': 'INR',
       'name': 'Bharat Doorstep Repair',
       'description': widget.serviceName,
-      'order_id': orderData['orderId'], // CRITICAL: Use order_id from backend
+      'order_id': orderData['orderId'],
       'prefill': {
         'contact': userData.mobile,
         'email': userData.email,
@@ -289,6 +321,9 @@ class _PaymentPageState extends State<PaymentPage> {
       },
       'notes': {
         'booking_id': _currentBookingId,
+        // ✅ NEW: Add coin info to Razorpay notes
+        'coins_used': widget.coinsUsed.toString(),
+        'coin_discount': widget.coinDiscount.toString(),
       },
     };
 
@@ -326,6 +361,38 @@ class _PaymentPageState extends State<PaymentPage> {
                 ),
                 const SizedBox(height: 16),
                 _buildPriceRow('Service Charge', widget.serviceCharge),
+                
+                // ✅ NEW: Show coin discount if applied
+                if (widget.coinsUsed > 0) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Coin Discount',
+                            style: TextStyle(fontSize: 14, color: Colors.green),
+                          ),
+                          Text(
+                            '(${widget.coinsUsed} coins used)',
+                            style: const TextStyle(fontSize: 11, color: AppColors.textGray),
+                          ),
+                        ],
+                      ),
+                      const Text(
+                        'Already applied',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                
                 const SizedBox(height: 8),
                 _buildPriceRow(
                   'Visiting Charge',
@@ -360,6 +427,26 @@ class _PaymentPageState extends State<PaymentPage> {
                     ),
                   ],
                 ),
+                
+                // ✅ NEW: Show savings if coins used
+                if (widget.coinsUsed > 0) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '🎉 You saved ₹${widget.coinDiscount.toStringAsFixed(2)} with coins!',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.green,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -403,7 +490,7 @@ class _PaymentPageState extends State<PaymentPage> {
                         SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Visiting charge is mandatory and non-refundable. GST @18% is applied on total taxable amount.',
+                            'Visiting charge is mandatory and non-refundable. Coin discount is applied before GST calculation. GST @18% is applied on taxable amount.',
                             style: TextStyle(fontSize: 13),
                           ),
                         ),

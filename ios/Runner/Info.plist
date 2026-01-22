@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- ✅ LOCATION PERMISSIONS - Required for GPS functionality -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs location access to automatically fill your address details.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs location access to automatically fill your address details.</string>
 </dict>
 </plist>

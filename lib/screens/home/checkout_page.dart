@@ -268,7 +268,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                         const SizedBox(height: 16),
                         _buildDetailRow('Service', widget.serviceName),
                         _buildDetailRow('Date & Time', '${widget.date} • ${widget.timeSlot.split(' - ')[0]}'),
-                        _buildDetailRow('Address', '${widget.address['type']} - ${widget.address['city']}'),
+                        _buildDetailRow('Address', '${widget.address['type']} - ${widget.address['city']} ${widget.address['pincode']}'),
                       ],
                     ),
                   ),

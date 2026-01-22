@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../constants/colors.dart';
+import '../../services/address_service.dart';
 import 'checkout_page.dart';
+import 'add_address_page.dart';
 
 class BookSlotPage extends StatefulWidget {
   final String serviceName;
@@ -24,18 +26,8 @@ class _BookSlotPageState extends State<BookSlotPage> {
   int selectedDateIndex = 0;
   int selectedTimeSlotIndex = -1;
 
-  final List<Map<String, String>> addresses = [
-    {
-      'type': 'Home',
-      'address': '123, MG Road, Sector 12',
-      'city': 'Mumbai - 400001',
-    },
-    {
-      'type': 'Office',
-      'address': '456, Park Street, Block A',
-      'city': 'Mumbai - 400002',
-    },
-  ];
+  List<Map<String, String>> addresses = [];
+  bool _isLoadingAddresses = true;
 
   // ✅ Generate dynamic dates
   late final List<Map<String, dynamic>> dates;
@@ -53,6 +45,46 @@ class _BookSlotPageState extends State<BookSlotPage> {
   void initState() {
     super.initState();
     dates = _generateDates();
+    _loadAddresses();
+  }
+
+  /// Load saved addresses from AddressService
+  Future<void> _loadAddresses() async {
+    try {
+      final savedAddresses = await AddressService.getSavedAddresses();
+      setState(() {
+        addresses = savedAddresses;
+        _isLoadingAddresses = false;
+      });
+    } catch (e) {
+      print('❌ Error loading addresses: $e');
+      setState(() {
+        _isLoadingAddresses = false;
+      });
+    }
+  }
+
+  /// Navigate to Add Address page
+  Future<void> _navigateToAddAddress({
+    Map<String, String>? existingAddress, 
+    int? index,
+    bool useCurrentLocation = false,
+  }) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddAddressPage(
+          existingAddress: existingAddress,
+          addressIndex: index,
+          useCurrentLocation: useCurrentLocation,
+        ),
+      ),
+    );
+
+    // Reload addresses if a new address was added/updated
+    if (result == true) {
+      await _loadAddresses();
+    }
   }
 
   // ✅ Generate next 7 days starting from today
@@ -178,78 +210,122 @@ class _BookSlotPageState extends State<BookSlotPage> {
                   ),
                   
                   // Address Cards
-                  ...addresses.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final address = entry.value;
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          selectedAddressIndex = index;
-                        });
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: selectedAddressIndex == index
-                                ? AppColors.primary
-                                : AppColors.bgMedium,
-                            width: selectedAddressIndex == index ? 2 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    address['type']!,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.textDark,
-                                    ),
+                  _isLoadingAddresses
+                      ? const Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      : addresses.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Center(
+                                child: Text(
+                                  'No saved addresses found.\nPlease add an address to continue.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: AppColors.textGray,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    address['address']!,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.textGray,
-                                    ),
-                                  ),
-                                  Text(
-                                    address['city']!,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: AppColors.textGray,
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
+                            )
+                          : Column(
+                              children: addresses.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final address = entry.value;
+                                return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    selectedAddressIndex = index;
+                                  });
+                                },
+                                child: Container(
+                                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: selectedAddressIndex == index
+                                          ? AppColors.primary
+                                          : AppColors.bgMedium,
+                                      width: selectedAddressIndex == index ? 2 : 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  address['type']!,
+                                                  style: const TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.w600,
+                                                    color: AppColors.textDark,
+                                                  ),
+                                                ),
+                                                const Spacer(),
+                                                GestureDetector(
+                                                  onTap: () => _navigateToAddAddress(
+                                                    existingAddress: address,
+                                                    index: index,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.edit,
+                                                    size: 18,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              address['address']!,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: AppColors.textGray,
+                                              ),
+                                            ),
+                                            Text(
+                                              '${address['city']!} - ${address['pincode']!}',
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: AppColors.textGray,
+                                              ),
+                                            ),
+                                            if (address['landmark']?.isNotEmpty == true)
+                                              Text(
+                                                'Near ${address['landmark']!}',
+                                                style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color: AppColors.textGray,
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (selectedAddressIndex == index)
+                                        const Icon(
+                                          Icons.check_circle,
+                                          color: AppColors.primary,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
                             ),
-                            if (selectedAddressIndex == index)
-                              const Icon(
-                                Icons.check_circle,
-                                color: AppColors.primary,
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
                   
                   // Add New Address Button
                   GestureDetector(
-                    onTap: () {
-                      // Add new address functionality
-                    },
+                    onTap: () => _navigateToAddAddress(),
                     child: Container(
-                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         border: Border.all(
@@ -265,6 +341,38 @@ class _BookSlotPageState extends State<BookSlotPage> {
                           SizedBox(width: 8),
                           Text(
                             'Add New Address',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // Use Current Location Button
+                  GestureDetector(
+                    onTap: () => _navigateToAddAddress(useCurrentLocation: true),
+                    child: Container(
+                      margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        border: Border.all(
+                          color: AppColors.primary,
+                          style: BorderStyle.solid,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.my_location, color: AppColors.primary),
+                          SizedBox(width: 8),
+                          Text(
+                            'Use Current Location',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
@@ -446,7 +554,10 @@ class _BookSlotPageState extends State<BookSlotPage> {
             child: SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: selectedTimeSlotIndex == -1 || availableTimeSlots.isEmpty
+                onPressed: selectedTimeSlotIndex == -1 || 
+                           availableTimeSlots.isEmpty || 
+                           addresses.isEmpty ||
+                           _isLoadingAddresses
                     ? null
                     : () {
                         Navigator.push(

@@ -269,8 +269,8 @@ class _PaymentPageState extends State<PaymentPage> {
       totalAmount: totalAmount,
       paymentStatus: 'pending',
       scheduledTime: '${widget.date} ${widget.timeSlot}',
-      address: '${widget.address['address']}, ${widget.address['city']}',
-      city: widget.address['city'],
+      address: '${widget.address['address']}, ${widget.address['city']} - ${widget.address['pincode']}',
+      city: widget.address['city']!,
       notes: widget.coinsUsed > 0 
           ? 'Area: $_selectedArea | Coins: ${widget.coinsUsed}' // ✅ NEW
           : 'Area: $_selectedArea',

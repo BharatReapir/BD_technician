@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../constants/colors.dart';
 import '../providers/auth_provider.dart';
 import '../screens/landing_page.dart';
+import 'saved_addresses_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({Key? key}) : super(key: key);
@@ -119,7 +120,14 @@ class ProfilePage extends StatelessWidget {
               Icons.location_on_outlined,
               'Saved Addresses',
               'Manage your addresses',
-              () {},
+              () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SavedAddressesPage(),
+                  ),
+                );
+              },
             ),
             _buildMenuItem(
               Icons.receipt_outlined,

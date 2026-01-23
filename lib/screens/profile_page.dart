@@ -262,13 +262,13 @@ class ProfilePage extends StatelessWidget {
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: isLogout 
-                    ? Colors.red.withOpacity(0.1) 
+                    ? AppColors.primary.withOpacity(0.1) 
                     : AppColors.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 icon,
-                color: isLogout ? Colors.red : AppColors.primary,
+                color: isLogout ? AppColors.primary : AppColors.primary,
                 size: 24,
               ),
             ),
@@ -282,7 +282,7 @@ class ProfilePage extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: isLogout ? Colors.red : AppColors.textDark,
+                      color: isLogout ? AppColors.primary : AppColors.textDark,
                     ),
                   ),
                   const SizedBox(height: 2),

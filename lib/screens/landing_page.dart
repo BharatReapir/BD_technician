@@ -53,10 +53,10 @@ class _LandingPageState extends State<LandingPage>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFEB4D4B), // dark pastel red
-              Color(0xFFFF7979), // medium pastel red
-              Color(0xFFFFAFAF), // light pastel red
-              Color(0xFFFAF7F2), // white background
+              Color(0xFF2D9596), // dark teal
+              Color(0xFF9AD0C2), // medium teal
+              Color(0xFFB8E6E1), // light teal
+              Color(0xFFF7FFFE), // white background
             ],
           ),
         ),
@@ -100,7 +100,7 @@ class _LandingPageState extends State<LandingPage>
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.red.withOpacity(0.15),
+                              color: AppColors.primary.withOpacity(0.15),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),

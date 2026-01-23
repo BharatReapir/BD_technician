@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../constants/colors.dart';
 
 class FirebaseDebugPage extends StatefulWidget {
   const FirebaseDebugPage({Key? key}) : super(key: key);
@@ -220,7 +221,7 @@ class _FirebaseDebugPageState extends State<FirebaseDebugPage> {
                         final log = _logs[index];
                         Color color = Colors.white;
                         if (log.contains('✅')) color = Colors.green;
-                        if (log.contains('❌')) color = Colors.red;
+                        if (log.contains('❌')) color = AppColors.primary;
                         if (log.contains('⚠️')) color = Colors.orange;
                         if (log.contains('📍') || log.contains('📝')) {
                           color = Colors.blue;

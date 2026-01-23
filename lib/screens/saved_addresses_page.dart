@@ -64,7 +64,7 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
             child: const Text('Delete'),
           ),
         ],
@@ -239,9 +239,9 @@ class _SavedAddressesPageState extends State<SavedAddressesPage> {
                     value: 'delete',
                     child: Row(
                       children: [
-                        Icon(Icons.delete, size: 18, color: Colors.red),
+                        Icon(Icons.delete, size: 18, color: AppColors.primary),
                         SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
+                        Text('Delete', style: TextStyle(color: AppColors.primary)),
                       ],
                     ),
                   ),

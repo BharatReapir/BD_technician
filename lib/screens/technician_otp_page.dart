@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/colors.dart';
 import '../providers/auth_provider.dart';
 import '../models/technician_model.dart';
 import 'technician_registration_page.dart';
@@ -109,7 +110,7 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Invalid OTP: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.primary,
           ),
         );
       }
@@ -144,7 +145,7 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error resending OTP: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.primary,
           ),
         );
       }

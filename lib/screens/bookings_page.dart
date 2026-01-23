@@ -261,7 +261,7 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
         statusText = 'COMPLETED';
         break;
       case 'cancelled':
-        statusColor = Colors.red;
+        statusColor = AppColors.primary;
         statusText = 'CANCELLED';
         break;
     }
@@ -481,14 +481,14 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
                       _showCancelDialog(booking);
                     },
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.red),
+                      side: const BorderSide(color: AppColors.primary),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                     child: const Text(
                       'Cancel',
-                      style: TextStyle(color: Colors.red),
+                      style: TextStyle(color: AppColors.primary),
                     ),
                   ),
                 ),
@@ -535,7 +535,7 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
               await _cancelBooking(booking);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.primary,
             ),
             child: const Text('Yes, Cancel', style: TextStyle(color: Colors.white)),
           ),
@@ -563,7 +563,7 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to cancel booking: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.primary,
         ),
       );
     }

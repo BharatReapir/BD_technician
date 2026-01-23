@@ -162,7 +162,7 @@ class _PaymentPageState extends State<PaymentPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Payment verification failed: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.primary,
         ),
       );
     } finally {
@@ -187,7 +187,7 @@ class _PaymentPageState extends State<PaymentPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Payment Failed: ${response.message}'),
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.primary,
       ),
     );
   }
@@ -244,7 +244,7 @@ class _PaymentPageState extends State<PaymentPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.primary,
         ),
       );
     } finally {

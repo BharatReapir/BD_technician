@@ -368,7 +368,7 @@ class _WalletPageState extends State<WalletPage> {
         break;
       case 'expired':
         icon = Icons.timelapse;
-        iconColor = Colors.red;
+        iconColor = AppColors.primary;
         break;
       case 'reversed':
         icon = Icons.undo;
@@ -429,7 +429,7 @@ class _WalletPageState extends State<WalletPage> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: transaction.isCredit ? Colors.green : Colors.red,
+                  color: transaction.isCredit ? Colors.green : AppColors.primary,
                 ),
               ),
               Text(

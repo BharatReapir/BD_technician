@@ -104,7 +104,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.primary,
             duration: const Duration(seconds: 3),
             action: e.toString().contains('settings') 
                 ? SnackBarAction(
@@ -171,7 +171,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to save address. Please try again.'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.primary,
           ),
         );
       }
@@ -423,7 +423,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
               if (required)
                 const TextSpan(
                   text: ' *',
-                  style: TextStyle(color: Colors.red),
+                  style: TextStyle(color: AppColors.primary),
                 ),
             ],
           ),
@@ -454,7 +454,7 @@ class _AddAddressPageState extends State<AddAddressPage> {
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.red),
+              borderSide: const BorderSide(color: AppColors.primary),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,

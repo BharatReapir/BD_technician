@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../constants/colors.dart';
 import 'job_in_progress_page.dart';
 
 class JobDetailsPage extends StatelessWidget {
@@ -122,7 +123,7 @@ class JobDetailsPage extends StatelessWidget {
                       valueColor: Colors.green),
                   const SizedBox(height: 12),
                   _buildInfoRow('Commission:', commission, 
-                      valueColor: Colors.red),
+                      valueColor: AppColors.primary),
                 ],
               ),
             ),

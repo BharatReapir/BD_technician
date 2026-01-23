@@ -348,7 +348,7 @@ class ServiceDetailsPage extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.cancel, color: Colors.red, size: 20),
+          const Icon(Icons.cancel, color: AppColors.primary, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(

@@ -62,9 +62,6 @@ class BharatDoorstepApp extends StatelessWidget {
     );
   }
 }
-
-/// 🔥 FIXED AuthChecker
-/// loadUser() is called ONCE in initState
 class AuthChecker extends StatefulWidget {
   const AuthChecker({Key? key}) : super(key: key);
 

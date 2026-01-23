@@ -83,7 +83,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ Verification failed: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.primary,
             duration: const Duration(seconds: 5),
           ),
         );
@@ -104,7 +104,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Payment Failed: ${response.message}'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.primary,
           duration: const Duration(seconds: 5),
         ),
       );
@@ -207,7 +207,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.primary,
           duration: const Duration(seconds: 5),
         ),
       );

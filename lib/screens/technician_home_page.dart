@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../constants/colors.dart';
 import '../providers/auth_provider.dart';
 import '../services/wallet_service.dart';
 import '../models/technician_model.dart';
@@ -395,8 +396,8 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                       child: OutlinedButton(
                         onPressed: () {},
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(color: Colors.red, width: 2),
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary, width: 2),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -420,7 +421,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                               const SnackBar(
                                 content: Text(
                                     'Insufficient wallet balance. Please recharge.'),
-                                backgroundColor: Colors.red,
+                                backgroundColor: AppColors.primary,
                               ),
                             );
                             return;
@@ -479,7 +480,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('Failed to accept job'),
-                                  backgroundColor: Colors.red,
+                                  backgroundColor: AppColors.primary,
                                 ),
                               );
                             }

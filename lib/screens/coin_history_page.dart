@@ -135,7 +135,7 @@ class _CoinHistoryPageState extends State<CoinHistoryPage> {
         break;
       case 'expired':
         icon = Icons.timelapse;
-        iconColor = Colors.red;
+        iconColor = AppColors.primary;
         typeLabel = 'Expired';
         break;
       case 'reversed':
@@ -209,7 +209,7 @@ class _CoinHistoryPageState extends State<CoinHistoryPage> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: transaction.isCredit ? Colors.green : Colors.red,
+                        color: transaction.isCredit ? Colors.green : AppColors.primary,
                       ),
                     ),
                     Text(

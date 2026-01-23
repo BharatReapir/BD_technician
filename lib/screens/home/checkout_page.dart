@@ -193,7 +193,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Please enter valid coins (1 - $maxCoins)'),
-                    backgroundColor: Colors.red,
+                    backgroundColor: AppColors.primary,
                   ),
                 );
               }

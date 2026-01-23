@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../constants/colors.dart';
 
 class JobInProgressPage extends StatefulWidget {
   final String jobId;
@@ -286,7 +287,7 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
                                     child: Container(
                                       padding: const EdgeInsets.all(4),
                                       decoration: BoxDecoration(
-                                        color: Colors.red,
+                                        color: AppColors.primary,
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(

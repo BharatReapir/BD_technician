@@ -1,3 +1,5 @@
+import '../utils/commission_calculator.dart';
+
 class BookingModel {
   final String id;
   final String userId;
@@ -54,7 +56,13 @@ class BookingModel {
     this.coinDiscount,
   });
 
-  double get earnings => totalAmount;
+  double get earnings => CommissionCalculator.getTechnicianEarnings(totalAmount);
+  
+  double get commission => CommissionCalculator.getCommission(totalAmount);
+  
+  String get commissionText => CommissionCalculator.formatCommissionText(totalAmount);
+  
+  String get earningsText => CommissionCalculator.formatEarningsText(totalAmount);
 
   Map<String, dynamic> toJson() {
     return {

@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../constants/colors.dart';
 import '../providers/auth_provider.dart';
 import '../models/technician_model.dart';
 import 'technician_home_page.dart';
@@ -40,7 +41,29 @@ class _TechnicianRegistrationPageState
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_updateButtonState);
+    _emailController.addListener(_updateButtonState);
+    _cityController.addListener(_updateButtonState);
+  }
+
+  void _updateButtonState() {
+    setState(() {});
+  }
+
+  bool get _isFormValid {
+    return _nameController.text.trim().isNotEmpty &&
+           _emailController.text.trim().isNotEmpty &&
+           _cityController.text.trim().isNotEmpty &&
+           _selectedSpecializations.isNotEmpty;
+  }
+
+  @override
   void dispose() {
+    _nameController.removeListener(_updateButtonState);
+    _emailController.removeListener(_updateButtonState);
+    _cityController.removeListener(_updateButtonState);
     _nameController.dispose();
     _emailController.dispose();
     _cityController.dispose();
@@ -215,7 +238,14 @@ class _TechnicianRegistrationPageState
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: _completeRegistration,
+                        onPressed: _isFormValid ? _completeRegistration : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _isFormValid ? AppColors.primary : AppColors.textGray,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                         child: const Text(
                           'Complete Registration',
                           style: TextStyle(fontSize: 16),

@@ -18,6 +18,37 @@ class _SignUpPageState extends State<SignUpPage> {
   String _selectedCity = '';
 
   @override
+  void initState() {
+    super.initState();
+    _nameController.addListener(_updateButtonState);
+    _mobileController.addListener(_updateButtonState);
+    _emailController.addListener(_updateButtonState);
+  }
+
+  void _updateButtonState() {
+    setState(() {});
+  }
+
+  bool get _isFormValid {
+    return _nameController.text.trim().isNotEmpty &&
+           _mobileController.text.trim().length == 10 &&
+           _emailController.text.trim().isNotEmpty &&
+           _selectedCity.isNotEmpty;
+  }
+
+  @override
+  void dispose() {
+    _nameController.removeListener(_updateButtonState);
+    _mobileController.removeListener(_updateButtonState);
+    _emailController.removeListener(_updateButtonState);
+    _nameController.dispose();
+    _mobileController.dispose();
+    _emailController.dispose();
+    _referralController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -209,7 +240,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: _isFormValid ? () {
                       if (_nameController.text.isEmpty || 
                           _mobileController.text.isEmpty ||
                           _emailController.text.isEmpty ||
@@ -231,9 +262,9 @@ class _SignUpPageState extends State<SignUpPage> {
                           ),
                         ),
                       );
-                    },
+                    } : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.lightGreen,
+                      backgroundColor: _isFormValid ? AppColors.primary : AppColors.textGray,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),

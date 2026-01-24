@@ -254,6 +254,83 @@ class _PaymentPageState extends State<PaymentPage> {
     }
   }
 
+  Future<void> _payLater() async {
+    if (_isProcessing) return;
+
+    setState(() => _isProcessing = true);
+
+    try {
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      if (firebaseUser == null) throw Exception('User not logged in');
+
+      final authProv = context.read<auth_provider.AuthProvider>();
+      final userData = authProv.user ?? await FirebaseService.getUser(firebaseUser.uid);
+      if (userData == null) throw Exception('User profile not found');
+
+      // Create booking with pay_later status
+      debugPrint('📝 Creating pay later booking...');
+      final bookingId = await _createPayLaterBooking(userData);
+
+      // ✅ Redeem coins if used (even for pay later)
+      if (widget.coinsUsed > 0) {
+        try {
+          await CoinService.redeemCoins(
+            userId: firebaseUser.uid,
+            bookingId: bookingId,
+            coinsToRedeem: widget.coinsUsed,
+          );
+          debugPrint('✅ ${widget.coinsUsed} coins redeemed successfully');
+        } catch (e) {
+          debugPrint('⚠️ Coin redemption error: $e');
+          // Continue with booking even if coin redemption fails
+        }
+      }
+
+      if (!mounted) return;
+
+      // Show success and navigate
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.coinsUsed > 0 
+              ? 'Booking confirmed! ${widget.coinsUsed} coins redeemed. Pay cash to technician.'
+              : 'Booking confirmed! Pay cash to technician.',
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => BookingSuccessPage(
+            serviceName: widget.serviceName,
+            amount: totalAmount,
+            date: widget.date,
+            timeSlot: widget.timeSlot,
+            bookingId: bookingId,
+          ),
+        ),
+      );
+
+    } catch (e) {
+      debugPrint('❌ Pay later error: $e');
+      
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: AppColors.primary,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isProcessing = false);
+      }
+    }
+  }
+
   Future<String> _createPendingBooking(dynamic userData) async {
     final booking = BookingModel(
       id: '',
@@ -277,6 +354,35 @@ class _PaymentPageState extends State<PaymentPage> {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
       // ✅ NEW: Add coin fields
+      coinsUsed: widget.coinsUsed,
+      coinDiscount: widget.coinDiscount,
+    );
+
+    return await FirebaseService.createBooking(booking);
+  }
+
+  Future<String> _createPayLaterBooking(dynamic userData) async {
+    final booking = BookingModel(
+      id: '',
+      userId: userData.uid,
+      userName: userData.name,
+      userPhone: userData.mobile,
+      service: widget.serviceName,
+      status: 'confirmed',
+      serviceCharge: widget.serviceCharge,
+      visitingCharge: visitingCharge,
+      taxableAmount: taxableAmount,
+      gstAmount: gstAmount,
+      totalAmount: totalAmount,
+      paymentStatus: 'pay_later',
+      scheduledTime: '${widget.date} ${widget.timeSlot}',
+      address: '${widget.address['address']}, ${widget.address['city']} - ${widget.address['pincode']}',
+      city: widget.address['city']!,
+      notes: widget.coinsUsed > 0 
+          ? 'Area: $_selectedArea | Coins: ${widget.coinsUsed} | Payment: Cash on Service'
+          : 'Area: $_selectedArea | Payment: Cash on Service',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
       coinsUsed: widget.coinsUsed,
       coinDiscount: widget.coinDiscount,
     );
@@ -502,7 +608,7 @@ class _PaymentPageState extends State<PaymentPage> {
             ),
           ),
 
-          // Pay Now Button
+          // Payment Options Section
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -515,36 +621,106 @@ class _PaymentPageState extends State<PaymentPage> {
                 ),
               ],
             ),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isProcessing ? null : _initiatePayment,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  disabledBackgroundColor: AppColors.bgMedium,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Choose Payment Method',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textDark,
                   ),
                 ),
-                child: _isProcessing
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text(
-                        'Pay Now',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
+                const SizedBox(height: 16),
+                
+                // Pay Later (Cash) Option
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _isProcessing ? null : _payLater,
+                    icon: const Icon(Icons.money, color: AppColors.primary),
+                    label: const Text(
+                      'Pay Later (Cash on Service)',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.primary, width: 2),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 12),
+                
+                // Pay Now (Razorpay) Option
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isProcessing ? null : _initiatePayment,
+                    icon: _isProcessing
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(Icons.payment, color: Colors.white),
+                    label: Text(
+                      _isProcessing ? 'Processing...' : 'Pay Now (Online)',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      disabledBackgroundColor: AppColors.bgMedium,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 12),
+                
+                // Payment Info
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: const [
+                      Icon(Icons.info_outline, color: AppColors.primary, size: 16),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Pay Later: Pay cash to technician after service completion\nPay Now: Secure online payment via Razorpay',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textDark,
+                            height: 1.4,
+                          ),
                         ),
                       ),
-              ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],

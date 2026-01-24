@@ -25,8 +25,25 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
   bool _isLoading = false;
 
   @override
+  void initState() {
+    super.initState();
+    for (var controller in _otpControllers) {
+      controller.addListener(_updateButtonState);
+    }
+  }
+
+  void _updateButtonState() {
+    setState(() {});
+  }
+
+  bool get _isOTPComplete {
+    return _otpControllers.every((controller) => controller.text.isNotEmpty);
+  }
+
+  @override
   void dispose() {
     for (var controller in _otpControllers) {
+      controller.removeListener(_updateButtonState);
       controller.dispose();
     }
     for (var node in _focusNodes) {
@@ -261,10 +278,10 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
                           width: double.infinity,
                           height: 56,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _verifyOTP,
+                            onPressed: (_isLoading || !_isOTPComplete) ? null : _verifyOTP,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: const Color(0xFF0047AB),
+                              backgroundColor: _isOTPComplete ? AppColors.primary : Colors.white.withOpacity(0.5),
+                              foregroundColor: _isOTPComplete ? Colors.white : const Color(0xFF0047AB),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),

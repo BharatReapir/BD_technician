@@ -420,6 +420,38 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                )
+              else if (booking.paymentStatus == 'pay_later')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'PAY ON SERVICE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
+              else if (booking.paymentStatus == 'pending')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'PENDING',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.orange,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
             ],
           ),
@@ -645,7 +677,7 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
                 '₹${booking.totalAmount.toStringAsFixed(2)}',
                 isBold: true,
               ),
-              _buildDetailRow('Payment Status', booking.paymentStatus.toUpperCase()),
+              _buildDetailRow('Payment Status', _getPaymentStatusText(booking.paymentStatus)),
               
               const Divider(height: 32),
               
@@ -722,5 +754,20 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
 
   String _formatDateTime(DateTime dateTime) {
     return '${dateTime.day}/${dateTime.month}/${dateTime.year} at ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _getPaymentStatusText(String paymentStatus) {
+    switch (paymentStatus.toLowerCase()) {
+      case 'paid':
+        return 'PAID';
+      case 'pay_later':
+        return 'PAY ON SERVICE';
+      case 'pending':
+        return 'PAYMENT PENDING';
+      case 'payment_failed':
+        return 'PAYMENT FAILED';
+      default:
+        return paymentStatus.toUpperCase();
+    }
   }
 }

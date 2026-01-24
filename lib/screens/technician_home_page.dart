@@ -4,6 +4,7 @@ import '../constants/colors.dart';
 import '../providers/auth_provider.dart';
 import '../services/wallet_service.dart';
 import '../models/technician_model.dart';
+import '../utils/commission_calculator.dart';
 import 'tech_wallet_page.dart';
 import 'job_details_page.dart'; // Add this import
 
@@ -181,10 +182,10 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                                       'AC Service & Repair',
                                       'MG Road, Mumbai',
                                       '09:00 AM - 11:00 AM',
-                                      '₹499',
+                                      '₹1,299', // Updated to show commission structure
                                       'Priya Sharma',
                                       'AC Repair',
-                                      '₹399',
+                                      '₹900', // This will be recalculated
                                       'job_001',
                                       '+91 98765 43210',
                                       '123, MG Road, Mumbai',
@@ -257,6 +258,12 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     String customerPhone,
     String customerAddress,
   ) {
+    // Parse total price to calculate actual earnings and commission
+    final totalAmount = double.tryParse(totalPrice.replaceAll('₹', '').replaceAll(',', '')) ?? 499.0;
+    final calculatedEarnings = CommissionCalculator.getTechnicianEarnings(totalAmount);
+    final commission = CommissionCalculator.getCommission(totalAmount);
+    final commissionText = CommissionCalculator.formatCommissionText(totalAmount);
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.all(16),
@@ -359,11 +366,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Service:',
+                      'Total Amount:',
                       style: TextStyle(fontSize: 14),
                     ),
                     Text(
-                      service,
+                      totalPrice,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -376,14 +383,32 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      'Earnings:',
+                      'Commission:',
                       style: TextStyle(fontSize: 14),
                     ),
                     Text(
-                      earnings,
+                      commissionText,
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Your Earnings:',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    Text(
+                      '₹${calculatedEarnings.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                         color: Colors.green,
                       ),
                     ),
@@ -468,8 +493,8 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                                       customerAddress: customerAddress,
                                       service: service,
                                       timeSlot: time,
-                                      earnings: earnings,
-                                      commission: '-₹100 (20%)',
+                                      earnings: '₹${calculatedEarnings.toStringAsFixed(0)}',
+                                      commission: commissionText,
                                     ),
                                   ),
                                 );

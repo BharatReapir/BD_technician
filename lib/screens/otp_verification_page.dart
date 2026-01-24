@@ -51,6 +51,28 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
       // Auto-send OTP for signup flow
       _sendOTPForSignup();
     }
+    
+    // Add listeners for OTP fields
+    for (var controller in _otpControllers) {
+      controller.addListener(_updateOTPButtonState);
+    }
+    _loginMobileController.addListener(_updateLoginButtonState);
+  }
+
+  void _updateOTPButtonState() {
+    setState(() {});
+  }
+
+  void _updateLoginButtonState() {
+    setState(() {});
+  }
+
+  bool get _isOTPComplete {
+    return _otpControllers.every((controller) => controller.text.isNotEmpty);
+  }
+
+  bool get _isLoginFormValid {
+    return _loginMobileController.text.trim().length == 10;
   }
 
   void _startTimer() {
@@ -280,9 +302,9 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
             width: double.infinity,
             height: 56,
             child: ElevatedButton(
-              onPressed: _isLoading ? null : _sendOTP,
+              onPressed: (_isLoading || !_isLoginFormValid) ? null : _sendOTP,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.lightGreen,
+                backgroundColor: _isLoginFormValid ? AppColors.primary : AppColors.textGray,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -441,9 +463,9 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
             width: double.infinity,
             height: 56,
             child: ElevatedButton(
-              onPressed: _isVerifying ? null : _verifyOTP,
+              onPressed: (_isVerifying || !_isOTPComplete) ? null : _verifyOTP,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.lightGreen,
+                backgroundColor: _isOTPComplete ? AppColors.primary : AppColors.textGray,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -501,10 +523,12 @@ class _OTPVerificationPageState extends State<OTPVerificationPage> {
 
   @override
   void dispose() {
-    _loginMobileController.dispose();
+    _loginMobileController.removeListener(_updateLoginButtonState);
     for (var controller in _otpControllers) {
+      controller.removeListener(_updateOTPButtonState);
       controller.dispose();
     }
+    _loginMobileController.dispose();
     for (var node in _focusNodes) {
       node.dispose();
     }

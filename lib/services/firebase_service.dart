@@ -137,19 +137,34 @@ class FirebaseService {
   /// Get technician by ID
   static Future<TechnicianModel?> getTechnician(String uid) async {
     try {
-      print('🔍 Fetching technician: $uid');
+      print('🔍 Fetching technician from Realtime DB: $uid');
+      print('🔗 Database URL: ${_realtimeDb.databaseURL}');
+      
       final snapshot = await _realtimeDb.ref('technicians/$uid').get();
       
+      print('📊 Snapshot exists: ${snapshot.exists}');
+      print('📊 Snapshot value: ${snapshot.value}');
+      
       if (snapshot.exists && snapshot.value != null) {
-        print('✅ Technician found: $uid');
+        print('✅ Raw technician data found: ${snapshot.value}');
+        
         final techData = Map<String, dynamic>.from(snapshot.value as Map);
-        return TechnicianModel.fromJson(techData);
+        print('🔧 Parsed technician data: $techData');
+        
+        final technician = TechnicianModel.fromJson(techData);
+        print('✅ Technician model created: ${technician.name} (${technician.uid})');
+        print('💰 Wallet: ₹${technician.walletBalance}');
+        print('🏙️ City: ${technician.city}');
+        print('🔧 Specializations: ${technician.specializations}');
+        
+        return technician;
       }
       
-      print('⚠️ Technician not found: $uid');
+      print('⚠️ Technician not found in Realtime DB: $uid');
       return null;
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ Error getting technician: $e');
+      print('📍 Stack trace: $stackTrace');
       return null;
     }
   }

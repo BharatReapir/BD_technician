@@ -74,6 +74,7 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
       final authProvider = context.read<AuthProvider>();
 
       // 1. ✅ Verify OTP using AuthProvider
+      debugPrint('🔐 Verifying OTP: $otp');
       final userCredential = await authProvider.verifyOTP(otp);
       final uid = userCredential.user!.uid;
       debugPrint('✅ OTP Verified for UID: $uid');
@@ -84,12 +85,17 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
       debugPrint('🔧 User type confirmed: technician');
 
       // 3. ✅ Check if technician profile exists in Realtime Database
+      debugPrint('🔍 Checking technician profile in Realtime DB...');
       TechnicianModel? technician = await authProvider.getTechnicianData(uid);
 
       if (technician != null) {
         // ✅ EXISTING TECHNICIAN - Profile found
         debugPrint('✅ Technician found: ${technician.name}');
+        debugPrint('📧 Email: ${technician.email}');
+        debugPrint('🏙️ City: ${technician.city}');
+        debugPrint('🔧 Specializations: ${technician.specializations}');
         debugPrint('💰 Wallet Balance: ₹${technician.walletBalance}');
+        debugPrint('🟢 Online Status: ${technician.isOnline}');
         
         // Save technician data to AuthProvider
         await authProvider.saveTechnician(technician);
@@ -107,7 +113,8 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
         }
       } else {
         // ⚠️ NEW TECHNICIAN - Profile not found, navigate to registration
-        debugPrint('⚠️ New technician detected - redirecting to registration');
+        debugPrint('⚠️ New technician detected - no profile found in Realtime DB');
+        debugPrint('📝 Redirecting to registration page...');
         
         if (mounted) {
           Navigator.pushReplacement(
@@ -123,11 +130,12 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
       }
     } catch (e) {
       debugPrint('❌ OTP Verification Error: $e');
+      debugPrint('📍 Stack trace: ${StackTrace.current}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Invalid OTP: ${e.toString()}'),
-            backgroundColor: AppColors.primary,
+            content: Text('Verification failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
           ),
         );
       }

@@ -119,14 +119,40 @@ class FirebaseService {
 
   // ========== TECHNICIAN OPERATIONS ==========
 
-  /// Create or update technician
+  /// Create or update technician - Updated to match backend structure
   static Future<void> saveTechnician(TechnicianModel technician) async {
     try {
       print('💾 Saving technician: ${technician.uid}');
-      final techJson = technician.toJson();
+      
+      // Backend structure for technician
+      final techJson = {
+        'uid': technician.uid,
+        'name': technician.name,
+        'mobile': technician.mobile,
+        'email': technician.email,
+        'city': technician.city,
+        'primaryPincode': technician.primaryPincode,
+        'fcmToken': technician.fcmToken,
+        'specializations': technician.specializations,
+        'status': technician.isOnline ? 'online' : 'offline', // Backend uses 'status'
+        'busy': false, // Backend tracks busy state
+        'totalJobs': technician.totalJobs,
+        'rating': technician.rating,
+        'walletBalance': technician.walletBalance,
+        'profileImage': technician.profileImage,
+        'createdAt': technician.createdAt.toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      };
+      
       print('🔧 Technician data: $techJson');
       
+      // 🔑 STEP 2A: Save to main technicians node
       await _realtimeDb.ref('technicians/${technician.uid}').set(techJson);
+      print('✅ Technician saved to main node');
+      
+      // 🔑 STEP 2B: Save to pincode mapping (matches backend structure)
+      await _saveTechnicianToMapping(technician);
+      
       print('✅ Technician saved successfully to Realtime Database');
     } catch (e) {
       print('❌ Error saving technician: $e');
@@ -134,7 +160,31 @@ class FirebaseService {
     }
   }
 
-  /// Get technician by ID
+  /// 🔑 STEP 2B: Save technician to pincode mapping (Updated to match backend)
+  static Future<void> _saveTechnicianToMapping(TechnicianModel technician) async {
+    try {
+      print('🗺️ Creating pincode mapping for: ${technician.uid} -> ${technician.primaryPincode}');
+      
+      // Create mapping data (simplified for backend compatibility)
+      final mappingData = {
+        'active': technician.isOnline,
+        'fcm': technician.fcmToken ?? '',
+        'rating': technician.rating,
+      };
+      
+      // Save to pincode_map/{pincode}/{technicianId} (matches backend)
+      await _realtimeDb
+          .ref('pincode_map/${technician.primaryPincode}/${technician.uid}')
+          .set(mappingData);
+      
+      print('✅ Technician mapped to pincode: ${technician.primaryPincode}');
+    } catch (e) {
+      print('❌ Error creating pincode mapping: $e');
+      rethrow;
+    }
+  }
+
+  /// Get technician by ID - Updated to handle backend structure
   static Future<TechnicianModel?> getTechnician(String uid) async {
     try {
       print('🔍 Fetching technician from Realtime DB: $uid');
@@ -151,10 +201,30 @@ class FirebaseService {
         final techData = Map<String, dynamic>.from(snapshot.value as Map);
         print('🔧 Parsed technician data: $techData');
         
-        final technician = TechnicianModel.fromJson(techData);
+        // Convert backend structure to model structure
+        final modelData = {
+          'uid': techData['uid'] ?? '',
+          'name': techData['name'] ?? '',
+          'mobile': techData['mobile'] ?? '',
+          'email': techData['email'] ?? '',
+          'city': techData['city'] ?? '',
+          'primaryPincode': techData['primaryPincode'] ?? '',
+          'fcmToken': techData['fcmToken'],
+          'specializations': techData['specializations'] ?? [],
+          'isOnline': techData['status'] == 'online', // Convert status to isOnline
+          'totalJobs': techData['totalJobs'] ?? 0,
+          'rating': techData['rating'] ?? 0.0,
+          'walletBalance': techData['walletBalance'] ?? 0.0,
+          'profileImage': techData['profileImage'],
+          'createdAt': techData['createdAt'],
+          'updatedAt': techData['updatedAt'],
+        };
+        
+        final technician = TechnicianModel.fromJson(modelData);
         print('✅ Technician model created: ${technician.name} (${technician.uid})');
         print('💰 Wallet: ₹${technician.walletBalance}');
         print('🏙️ City: ${technician.city}');
+        print('📍 Pincode: ${technician.primaryPincode}');
         print('🔧 Specializations: ${technician.specializations}');
         
         return technician;
@@ -169,14 +239,32 @@ class FirebaseService {
     }
   }
 
-  /// Update technician status (online/offline)
+  /// Update technician status (online/offline) - Updated to match backend
   static Future<void> updateTechnicianStatus(String uid, bool isOnline) async {
     try {
       print('🔄 Updating technician status: $uid -> ${isOnline ? "ONLINE" : "OFFLINE"}');
+      
+      // Update main technician node with backend structure
       await _realtimeDb.ref('technicians/$uid').update({
-        'isOnline': isOnline,
+        'status': isOnline ? 'online' : 'offline', // Backend uses 'status' not 'isOnline'
+        'busy': false, // Backend tracks busy state
         'updatedAt': DateTime.now().toIso8601String(),
       });
+      
+      // 🔑 Update mapping node status (pincode_map structure)
+      final techSnapshot = await _realtimeDb.ref('technicians/$uid').get();
+      if (techSnapshot.exists && techSnapshot.value != null) {
+        final techData = Map<String, dynamic>.from(techSnapshot.value as Map);
+        final pincode = techData['primaryPincode'];
+        
+        if (pincode != null) {
+          await _realtimeDb
+              .ref('pincode_map/$pincode/$uid')
+              .update({'active': isOnline});
+          print('✅ Mapping status updated for pincode: $pincode');
+        }
+      }
+      
       print('✅ Technician status updated successfully');
     } catch (e) {
       print('❌ Error updating technician status: $e');
@@ -283,12 +371,82 @@ class FirebaseService {
     });
   }
 
+  // ========== BACKEND COMPATIBLE FUNCTIONS ==========
+
+  /// Accept booking (technician side) - Matches backend logic
+  static Future<void> acceptBooking(String bookingId, String technicianId) async {
+    try {
+      print('✅ Technician accepting booking: $bookingId');
+      
+      // Update booking status to accepted
+      await _realtimeDb.ref('bookings/$bookingId').update({
+        'status': 'accepted',
+        'assignedTo': technicianId,
+        'acceptedAt': DateTime.now().millisecondsSinceEpoch,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      
+      // Set technician as busy
+      await _realtimeDb.ref('technicians/$technicianId/busy').set(true);
+      
+      print('✅ Booking accepted successfully');
+    } catch (e) {
+      print('❌ Error accepting booking: $e');
+      rethrow;
+    }
+  }
+
+  /// Reject booking (technician side) - Matches backend logic  
+  static Future<void> rejectBooking(String bookingId, String technicianId) async {
+    try {
+      print('❌ Technician rejecting booking: $bookingId');
+      
+      // Add to reject log
+      await _realtimeDb.ref('reject_log/$bookingId/$technicianId').set(true);
+      
+      // Free up technician
+      await _realtimeDb.ref('technicians/$technicianId/busy').set(false);
+      
+      // Reset booking to pending (backend will reassign)
+      await _realtimeDb.ref('bookings/$bookingId').update({
+        'status': 'pending',
+        'assignedTo': null,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      
+      print('✅ Booking rejected successfully');
+    } catch (e) {
+      print('❌ Error rejecting booking: $e');
+      rethrow;
+    }
+  }
+
+  /// Stream technician's assigned bookings (real-time)
+  static Stream<List<BookingModel>> streamTechnicianAssignedBookings(String technicianId) {
+    return _realtimeDb.ref('bookings')
+        .orderByChild('assignedTo')
+        .equalTo(technicianId)
+        .onValue
+        .map((event) {
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        final bookingsMap = Map<String, dynamic>.from(event.snapshot.value as Map);
+        return bookingsMap.entries
+            .map((entry) => BookingModel.fromJson(Map<String, dynamic>.from(entry.value)))
+            .where((booking) => ['assigned', 'accepted', 'in_progress'].contains(booking.status))
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      }
+      return [];
+    });
+  }
+
   // ========== BOOKING OPERATIONS ==========
 
-  /// Create new booking
+  /// Create new booking with pincode
   static Future<String> createBooking(BookingModel booking) async {
     try {
       print('📝 Creating booking in Realtime Database...');
+      print('🔑 Booking pincode: ${booking.pincode}');
       
       // ✅ Use the singleton _realtimeDb instance
       final bookingRef = _realtimeDb.ref('bookings').push();
@@ -300,6 +458,9 @@ class FirebaseService {
       print('📄 Booking data: $bookingJson');
       await bookingRef.set(bookingJson);
       print('✅ Booking created with ID: $bookingId');
+      
+      // 🔑 STEP 3: Booking created, Cloud Function will handle technician notification
+      print('🔔 Booking ready for Cloud Function processing (pincode: ${booking.pincode})');
       
       return bookingId;
     } catch (e) {

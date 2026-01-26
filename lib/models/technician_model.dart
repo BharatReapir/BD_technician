@@ -22,6 +22,8 @@ class TechnicianModel {
   final String mobile;
   final String email;
   final String city;
+  final String primaryPincode; // 🔑 NEW: Primary pincode for mapping
+  final String? fcmToken; // 🔑 NEW: FCM token for notifications
   final List<String> specializations;
   final bool isOnline;
   final int totalJobs;
@@ -37,6 +39,8 @@ class TechnicianModel {
     required this.mobile,
     required this.email,
     required this.city,
+    required this.primaryPincode, // 🔑 NEW: Required pincode
+    this.fcmToken, // 🔑 NEW: FCM token
     required this.specializations,
     this.isOnline = false,
     this.totalJobs = 0,
@@ -54,6 +58,8 @@ class TechnicianModel {
       'mobile': mobile,
       'email': email,
       'city': city,
+      'primaryPincode': primaryPincode, // 🔑 NEW
+      'fcmToken': fcmToken, // 🔑 NEW
       'specializations': specializations,
       'isOnline': isOnline,
       'totalJobs': totalJobs,
@@ -72,6 +78,8 @@ class TechnicianModel {
       mobile: json['mobile'] ?? '',
       email: json['email'] ?? '',
       city: json['city'] ?? '',
+      primaryPincode: json['primaryPincode'] ?? '', // 🔑 NEW
+      fcmToken: json['fcmToken'], // 🔑 NEW
       specializations: List<String>.from(json['specializations'] ?? []),
       isOnline: json['isOnline'] ?? false,
       totalJobs: json['totalJobs'] ?? 0,
@@ -91,6 +99,8 @@ class TechnicianModel {
     String? mobile,
     String? email,
     String? city,
+    String? primaryPincode, // 🔑 NEW
+    String? fcmToken, // 🔑 NEW
     List<String>? specializations,
     bool? isOnline,
     int? totalJobs,
@@ -106,6 +116,8 @@ class TechnicianModel {
       mobile: mobile ?? this.mobile,
       email: email ?? this.email,
       city: city ?? this.city,
+      primaryPincode: primaryPincode ?? this.primaryPincode, // 🔑 NEW
+      fcmToken: fcmToken ?? this.fcmToken, // 🔑 NEW
       specializations: specializations ?? this.specializations,
       isOnline: isOnline ?? this.isOnline,
       totalJobs: totalJobs ?? this.totalJobs,

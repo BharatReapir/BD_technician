@@ -348,6 +348,7 @@ class _PaymentPageState extends State<PaymentPage> {
       scheduledTime: '${widget.date} ${widget.timeSlot}',
       address: '${widget.address['address']}, ${widget.address['city']} - ${widget.address['pincode']}',
       city: widget.address['city']!,
+      pincode: widget.address['pincode']!, // 🔑 NEW: Extract pincode for mapping
       notes: widget.coinsUsed > 0 
           ? 'Area: $_selectedArea | Coins: ${widget.coinsUsed}' // ✅ NEW
           : 'Area: $_selectedArea',
@@ -378,6 +379,7 @@ class _PaymentPageState extends State<PaymentPage> {
       scheduledTime: '${widget.date} ${widget.timeSlot}',
       address: '${widget.address['address']}, ${widget.address['city']} - ${widget.address['pincode']}',
       city: widget.address['city']!,
+      pincode: widget.address['pincode']!, // 🔑 NEW: Extract pincode for mapping
       notes: widget.coinsUsed > 0 
           ? 'Area: $_selectedArea | Coins: ${widget.coinsUsed} | Payment: Cash on Service'
           : 'Area: $_selectedArea | Payment: Cash on Service',

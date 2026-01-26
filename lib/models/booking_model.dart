@@ -18,6 +18,7 @@ class BookingModel {
   final String scheduledTime;
   final String? address;
   final String? city;
+  final String? pincode; // 🔑 NEW: Pincode for mapping
   final String? technicianId;
   final String? technicianName;
   final String? notes;
@@ -46,6 +47,7 @@ class BookingModel {
     required this.scheduledTime,
     this.address,
     this.city,
+    this.pincode, // 🔑 NEW: Pincode parameter
     this.technicianId,
     this.technicianName,
     this.notes,
@@ -83,6 +85,7 @@ class BookingModel {
       'scheduledTime': scheduledTime,
       'address': address,
       'city': city,
+      'pincode': pincode, // 🔑 NEW: Pincode in JSON
       'technicianId': technicianId,
       'technicianName': technicianName,
       'notes': notes,
@@ -113,6 +116,7 @@ class BookingModel {
       scheduledTime: json['scheduledTime'] ?? '',
       address: json['address'],
       city: json['city'],
+      pincode: json['pincode'], // 🔑 NEW: Parse pincode
       technicianId: json['technicianId'],
       technicianName: json['technicianName'],
       notes: json['notes'],
@@ -154,6 +158,7 @@ class BookingModel {
     String? scheduledTime,
     String? address,
     String? city,
+    String? pincode, // 🔑 NEW: Pincode in copyWith
     String? technicianId,
     String? technicianName,
     String? notes,
@@ -181,6 +186,7 @@ class BookingModel {
       scheduledTime: scheduledTime ?? this.scheduledTime,
       address: address ?? this.address,
       city: city ?? this.city,
+      pincode: pincode ?? this.pincode, // 🔑 NEW: Pincode in copyWith
       technicianId: technicianId ?? this.technicianId,
       technicianName: technicianName ?? this.technicianName,
       notes: notes ?? this.notes,

@@ -75,6 +75,8 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
 
       // 1. ✅ Verify OTP using AuthProvider
       debugPrint('🔐 Verifying OTP: $otp');
+      debugPrint('📱 Phone number: ${widget.phoneNumber}');
+      
       final userCredential = await authProvider.verifyOTP(otp);
       final uid = userCredential.user!.uid;
       debugPrint('✅ OTP Verified for UID: $uid');
@@ -93,6 +95,7 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
         debugPrint('✅ Technician found: ${technician.name}');
         debugPrint('📧 Email: ${technician.email}');
         debugPrint('🏙️ City: ${technician.city}');
+        debugPrint('📍 Pincode: ${technician.primaryPincode}');
         debugPrint('🔧 Specializations: ${technician.specializations}');
         debugPrint('💰 Wallet Balance: ₹${technician.walletBalance}');
         debugPrint('🟢 Online Status: ${technician.isOnline}');
@@ -131,10 +134,24 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
     } catch (e) {
       debugPrint('❌ OTP Verification Error: $e');
       debugPrint('📍 Stack trace: ${StackTrace.current}');
+      
+      String errorMessage = 'Verification failed';
+      if (e.toString().contains('Please request OTP first')) {
+        errorMessage = 'Session expired. Please request OTP again.';
+        // Go back to login page
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      } else if (e.toString().contains('invalid-verification-code')) {
+        errorMessage = 'Invalid OTP. Please check and try again.';
+      } else if (e.toString().contains('session-expired')) {
+        errorMessage = 'OTP expired. Please request a new one.';
+      }
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Verification failed: ${e.toString()}'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
           ),
         );
@@ -154,6 +171,7 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
     });
 
     try {
+      debugPrint('🔄 Resending OTP to: ${widget.phoneNumber}');
       final authProvider = context.read<AuthProvider>();
       await authProvider.sendOTP(widget.phoneNumber);
       
@@ -164,13 +182,19 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
             backgroundColor: Colors.green,
           ),
         );
+        
+        // Clear existing OTP fields
+        for (var controller in _otpControllers) {
+          controller.clear();
+        }
       }
     } catch (e) {
+      debugPrint('❌ Error resending OTP: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error resending OTP: $e'),
-            backgroundColor: AppColors.primary,
+            backgroundColor: Colors.red,
           ),
         );
       }

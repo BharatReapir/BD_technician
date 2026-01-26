@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import '../constants/colors.dart';
 import '../providers/auth_provider.dart';
 import '../services/wallet_service.dart';
+import '../services/firebase_service.dart'; // 🔔 NEW: Import FirebaseService
 import '../models/technician_model.dart';
+import '../models/booking_model.dart'; // 🔔 NEW: Import BookingModel
 import '../utils/commission_calculator.dart';
 import 'tech_wallet_page.dart';
 import 'job_details_page.dart'; // Add this import
@@ -149,6 +151,54 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                           ],
                         ),
                       ),
+                      const SizedBox(height: 16),
+                      
+                      // 🔔 NEW: Booking Notifications Section
+                      StreamBuilder<List<BookingModel>>(
+                        stream: FirebaseService.streamTechnicianAssignedBookings(currentTechnician.uid),
+                        builder: (context, bookingSnapshot) {
+                          if (bookingSnapshot.hasData && bookingSnapshot.data!.isNotEmpty) {
+                            final assignedBookings = bookingSnapshot.data!
+                                .where((booking) => booking.status == 'assigned')
+                                .toList();
+                            
+                            if (assignedBookings.isNotEmpty) {
+                              return Container(
+                                margin: const EdgeInsets.symmetric(horizontal: 16),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.orange, width: 2),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.notification_important, color: Colors.orange.shade700),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'New Booking Assigned!',
+                                          style: TextStyle(
+                                            color: Colors.orange.shade700,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    ...assignedBookings.map((booking) => _buildBookingNotification(booking)),
+                                  ],
+                                ),
+                              );
+                            }
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                      
                       const SizedBox(height: 24),
                       Expanded(
                         child: Container(
@@ -532,6 +582,128 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔔 NEW: Booking notification widget
+  Widget _buildBookingNotification(BookingModel booking) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                booking.service,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              Text(
+                '₹${booking.totalAmount.toStringAsFixed(0)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            booking.userName,
+            style: const TextStyle(fontSize: 14),
+          ),
+          Text(
+            booking.address ?? 'Address not provided',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    // 🔔 Accept booking
+                    try {
+                      await FirebaseService.acceptBooking(booking.id, booking.userId);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Booking accepted!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Accept'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () async {
+                    // 🔔 Reject booking
+                    try {
+                      final techId = context.read<AuthProvider>().technician?.uid;
+                      if (techId != null) {
+                        await FirebaseService.rejectBooking(booking.id, techId);
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Booking rejected'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                  ),
+                  child: const Text('Reject'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

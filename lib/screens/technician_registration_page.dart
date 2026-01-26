@@ -27,6 +27,7 @@ class _TechnicianRegistrationPageState
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _cityController = TextEditingController();
+  final _pincodeController = TextEditingController(); // 🔑 NEW: Pincode field
 
   List<String> _selectedSpecializations = [];
   final List<String> _availableSpecializations = [
@@ -46,6 +47,7 @@ class _TechnicianRegistrationPageState
     _nameController.addListener(_updateButtonState);
     _emailController.addListener(_updateButtonState);
     _cityController.addListener(_updateButtonState);
+    _pincodeController.addListener(_updateButtonState); // 🔑 NEW: Pincode listener
   }
 
   void _updateButtonState() {
@@ -56,6 +58,7 @@ class _TechnicianRegistrationPageState
     return _nameController.text.trim().isNotEmpty &&
            _emailController.text.trim().isNotEmpty &&
            _cityController.text.trim().isNotEmpty &&
+           _pincodeController.text.trim().length == 6 && // 🔑 NEW: Pincode validation
            _selectedSpecializations.isNotEmpty;
   }
 
@@ -64,9 +67,11 @@ class _TechnicianRegistrationPageState
     _nameController.removeListener(_updateButtonState);
     _emailController.removeListener(_updateButtonState);
     _cityController.removeListener(_updateButtonState);
+    _pincodeController.removeListener(_updateButtonState); // 🔑 NEW: Pincode dispose
     _nameController.dispose();
     _emailController.dispose();
     _cityController.dispose();
+    _pincodeController.dispose(); // 🔑 NEW: Pincode dispose
     super.dispose();
   }
 
@@ -85,12 +90,16 @@ class _TechnicianRegistrationPageState
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // 🔑 STEP 2: Create technician with pincode mapping
       final technician = TechnicianModel(
         uid: FirebaseAuth.instance.currentUser!.uid,
         name: _nameController.text.trim(),
         mobile: widget.phoneNumber,
         email: _emailController.text.trim(),
         city: _cityController.text.trim(),
+        primaryPincode: _pincodeController.text.trim(), // 🔑 NEW: Primary pincode
+        fcmToken: null, // TODO: Get FCM token
         specializations: _selectedSpecializations,
         isOnline: true,
         totalJobs: 0,
@@ -196,6 +205,29 @@ class _TechnicianRegistrationPageState
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter your city';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 🔑 NEW: Primary Pincode
+                    TextFormField(
+                      controller: _pincodeController,
+                      decoration: const InputDecoration(
+                        labelText: 'Primary Pincode',
+                        prefixIcon: Icon(Icons.pin_drop),
+                        border: OutlineInputBorder(),
+                        helperText: 'Main area where you provide services',
+                      ),
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your primary pincode';
+                        }
+                        if (value.length != 6) {
+                          return 'Pincode must be 6 digits';
                         }
                         return null;
                       },

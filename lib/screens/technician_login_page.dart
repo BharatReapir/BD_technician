@@ -40,11 +40,16 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
       await prefs.setString('userType', 'technician');
       debugPrint('🔧 User type set to: technician');
 
-      // ✅ Use AuthProvider to send OTP
+      // ✅ Use AuthProvider to send OTP and WAIT for it to complete
       final authProvider = context.read<AuthProvider>();
+      debugPrint('📱 Sending OTP to: ${_phoneController.text}');
+      
       await authProvider.sendOTP(_phoneController.text);
+      debugPrint('✅ OTP sent successfully');
 
+      // ✅ Only navigate AFTER OTP is sent successfully
       if (mounted) {
+        debugPrint('🔄 Navigating to OTP page');
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -55,9 +60,13 @@ class _TechnicianLoginPageState extends State<TechnicianLoginPage> {
         );
       }
     } catch (e) {
+      debugPrint('❌ Error sending OTP: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error sending OTP: $e')),
+          SnackBar(
+            content: Text('Error sending OTP: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {

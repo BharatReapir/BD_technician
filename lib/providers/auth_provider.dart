@@ -5,6 +5,7 @@ import '../models/user_model.dart';
 import '../models/technician_model.dart';
 import '../services/firebase_service.dart';
 import 'dart:convert';
+import 'dart:async'; // 🔧 NEW: For Completer
 
 class AuthProvider extends ChangeNotifier {
   UserModel? _user;
@@ -51,30 +52,48 @@ class AuthProvider extends ChangeNotifier {
 
   // ✅ Send OTP for Phone Authentication
   Future<void> sendOTP(String phoneNumber) async {
+    debugPrint('📱 Sending OTP to: +91$phoneNumber');
+    
+    // Create a completer to wait for the verification ID
+    final completer = Completer<void>();
+    
     await _auth.verifyPhoneNumber(
       phoneNumber: '+91$phoneNumber',
       verificationCompleted: (PhoneAuthCredential credential) async {
+        debugPrint('🔐 Auto verification completed');
         await _auth.signInWithCredential(credential);
+        if (!completer.isCompleted) completer.complete();
       },
       verificationFailed: (FirebaseAuthException e) {
-        throw Exception(e.message ?? 'Verification failed');
+        debugPrint('❌ Verification failed: ${e.message}');
+        if (!completer.isCompleted) completer.completeError(Exception(e.message ?? 'Verification failed'));
       },
       codeSent: (String verificationId, int? resendToken) {
         _verificationId = verificationId;
         debugPrint('📱 OTP Sent! Verification ID: $verificationId');
+        debugPrint('🔑 Stored verification ID: $_verificationId');
+        if (!completer.isCompleted) completer.complete();
       },
       codeAutoRetrievalTimeout: (String verificationId) {
         _verificationId = verificationId;
+        debugPrint('⏰ Auto retrieval timeout. Verification ID: $verificationId');
+        if (!completer.isCompleted) completer.complete();
       },
       timeout: const Duration(seconds: 60),
     );
+    
+    // Wait for either codeSent or verificationCompleted
+    await completer.future;
+    debugPrint('✅ OTP process completed, verification ID: $_verificationId');
   }
 
   // ✅ Verify OTP
   Future<UserCredential> verifyOTP(String otp) async {
-    debugPrint('🔐 Verifying OTP with ID: $_verificationId');
+    debugPrint('🔐 Verifying OTP: $otp');
+    debugPrint('🔑 Using verification ID: $_verificationId');
     
     if (_verificationId == null || _verificationId!.isEmpty) {
+      debugPrint('❌ No verification ID found');
       throw Exception('Please request OTP first');
     }
     
@@ -83,7 +102,11 @@ class AuthProvider extends ChangeNotifier {
       smsCode: otp,
     );
     
-    return await _auth.signInWithCredential(credential);
+    debugPrint('🔐 Signing in with credential...');
+    final userCredential = await _auth.signInWithCredential(credential);
+    debugPrint('✅ Sign in successful: ${userCredential.user?.uid}');
+    
+    return userCredential;
   }
 
   /// 🔹 LOAD USER ON APP START

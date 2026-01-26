@@ -17,6 +17,7 @@
     "crypto": "^1.0.1",
     "firebase-admin": "^11.8.0",
     "firebase-functions": "^4.3.1",
+    "nodemailer": "^7.0.12",
     "razorpay": "^2.9.6"
   },
   "devDependencies": {

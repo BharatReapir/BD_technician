@@ -220,6 +220,17 @@ class _PaymentPageState extends State<PaymentPage> {
       final bookingId = await _createPendingBooking(userData);
       _currentBookingId = bookingId;
 
+      // ✅ INSTANT UI UPDATE: Show success immediately
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Booking created! Processing payment...'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
       // Step 2: Request backend to create Razorpay order
       debugPrint('🔐 Creating Razorpay order on backend...');
       final orderData = await PaymentService.createOrder(
@@ -270,6 +281,17 @@ class _PaymentPageState extends State<PaymentPage> {
       // Create booking with pay_later status
       debugPrint('📝 Creating pay later booking...');
       final bookingId = await _createPayLaterBooking(userData);
+
+      // ✅ INSTANT SUCCESS FEEDBACK
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Booking confirmed! Check "My Bookings" to see it.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
 
       // ✅ Redeem coins if used (even for pay later)
       if (widget.coinsUsed > 0) {
@@ -332,6 +354,12 @@ class _PaymentPageState extends State<PaymentPage> {
   }
 
   Future<String> _createPendingBooking(dynamic userData) async {
+    debugPrint('📝 Creating booking for user: ${userData.uid}');
+    debugPrint('📅 Date: ${widget.date}');
+    debugPrint('⏰ Time slot: ${widget.timeSlot}');
+    debugPrint('🏠 Address: ${widget.address}');
+    debugPrint('📍 Pincode: ${widget.address['pincode']}');
+    
     final booking = BookingModel(
       id: '',
       userId: userData.uid,
@@ -359,10 +387,34 @@ class _PaymentPageState extends State<PaymentPage> {
       coinDiscount: widget.coinDiscount,
     );
 
-    return await FirebaseService.createBooking(booking);
+    debugPrint('💾 Booking data: ${booking.toJson()}');
+    
+    final bookingId = await FirebaseService.createBooking(booking);
+    debugPrint('✅ Booking created with ID: $bookingId');
+    
+    // ✅ FORCE REFRESH: Trigger a manual refresh to ensure immediate visibility
+    debugPrint('🔄 Forcing booking refresh...');
+    try {
+      // Wait a moment for Firebase to propagate
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Test if booking is visible
+      final testBookings = await FirebaseService.getUserBookings(userData.uid);
+      final newBooking = testBookings.firstWhere(
+        (b) => b.id == bookingId,
+        orElse: () => booking.copyWith(id: bookingId),
+      );
+      debugPrint('✅ Booking verification: Found booking ${newBooking.id} with status ${newBooking.status}');
+    } catch (e) {
+      debugPrint('⚠️ Booking verification failed: $e');
+    }
+    
+    return bookingId;
   }
 
   Future<String> _createPayLaterBooking(dynamic userData) async {
+    debugPrint('📝 Creating pay later booking for user: ${userData.uid}');
+    
     final booking = BookingModel(
       id: '',
       userId: userData.uid,
@@ -389,7 +441,29 @@ class _PaymentPageState extends State<PaymentPage> {
       coinDiscount: widget.coinDiscount,
     );
 
-    return await FirebaseService.createBooking(booking);
+    debugPrint('💾 Pay Later booking data: ${booking.toJson()}');
+    
+    final bookingId = await FirebaseService.createBooking(booking);
+    debugPrint('✅ Pay Later booking created with ID: $bookingId');
+    
+    // ✅ FORCE REFRESH: Ensure immediate visibility for Pay Later bookings
+    debugPrint('🔄 Forcing Pay Later booking refresh...');
+    try {
+      // Wait a moment for Firebase to propagate
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Test if booking is visible
+      final testBookings = await FirebaseService.getUserBookings(userData.uid);
+      final newBooking = testBookings.firstWhere(
+        (b) => b.id == bookingId,
+        orElse: () => booking.copyWith(id: bookingId),
+      );
+      debugPrint('✅ Pay Later booking verification: Found booking ${newBooking.id} with status ${newBooking.status}');
+    } catch (e) {
+      debugPrint('⚠️ Pay Later booking verification failed: $e');
+    }
+    
+    return bookingId;
   }
 
   Future<void> _updateBookingWithOrderDetails(

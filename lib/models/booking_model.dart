@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 import '../utils/commission_calculator.dart';
 
 class BookingModel {
@@ -99,37 +101,61 @@ class BookingModel {
 
   factory BookingModel.fromJson(Map<String, dynamic> json) {
     return BookingModel(
-      id: json['id'] ?? '',
-      userId: json['userId'] ?? '',
-      userName: json['userName'] ?? '',
-      userPhone: json['userPhone'] ?? '',
-      service: json['service'] ?? '',
-      status: json['status'] ?? 'pending',
+      id: json['id']?.toString() ?? '',
+      userId: json['userId']?.toString() ?? '',
+      userName: json['userName']?.toString() ?? '',
+      userPhone: json['userPhone']?.toString() ?? '',
+      service: json['service']?.toString() ?? '',
+      status: json['status']?.toString() ?? 'pending',
       serviceCharge: _toDouble(json['serviceCharge']),
       visitingCharge: _toDouble(json['visitingCharge']),
       taxableAmount: _toDouble(json['taxableAmount']),
       gstAmount: _toDouble(json['gstAmount']),
       totalAmount: _toDouble(json['totalAmount']),
-      paymentId: json['paymentId'],
-      razorpayOrderId: json['razorpayOrderId'],
-      paymentStatus: json['paymentStatus'] ?? 'pending',
-      scheduledTime: json['scheduledTime'] ?? '',
-      address: json['address'],
-      city: json['city'],
-      pincode: json['pincode'], // 🔑 NEW: Parse pincode
-      technicianId: json['technicianId'],
-      technicianName: json['technicianName'],
-      notes: json['notes'],
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'])
-          : DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'])
-          : DateTime.now(),
+      paymentId: json['paymentId']?.toString(),
+      razorpayOrderId: json['razorpayOrderId']?.toString(),
+      paymentStatus: json['paymentStatus']?.toString() ?? 'pending',
+      scheduledTime: json['scheduledTime']?.toString() ?? '',
+      address: json['address']?.toString(),
+      city: json['city']?.toString(),
+      pincode: json['pincode']?.toString(), // ✅ FIX: Convert to string
+      technicianId: json['technicianId']?.toString(),
+      technicianName: json['technicianName']?.toString(),
+      notes: json['notes']?.toString(),
+      createdAt: _parseDateTime(json['createdAt']), // ✅ FIX: Better date parsing
+      updatedAt: _parseDateTime(json['updatedAt']), // ✅ FIX: Better date parsing
       // ✅ NEW: Parse coin fields
       coinsUsed: json['coinsUsed'] is int ? json['coinsUsed'] : (json['coinsUsed'] != null ? int.tryParse(json['coinsUsed'].toString()) : 0),
       coinDiscount: _toDouble(json['coinDiscount']),
     );
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+    
+    // Handle milliseconds timestamp
+    if (value is int) {
+      return DateTime.fromMillisecondsSinceEpoch(value);
+    }
+    
+    // Handle string timestamp
+    if (value is String) {
+      // Try parsing as milliseconds first
+      final timestamp = int.tryParse(value);
+      if (timestamp != null) {
+        return DateTime.fromMillisecondsSinceEpoch(timestamp);
+      }
+      
+      // Try parsing as ISO string
+      try {
+        return DateTime.parse(value);
+      } catch (e) {
+        debugPrint('⚠️ Failed to parse date: $value');
+        return DateTime.now();
+      }
+    }
+    
+    return DateTime.now();
   }
 
   static double _toDouble(dynamic value) {

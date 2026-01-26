@@ -39,16 +39,18 @@ class UserModel {
   // Create from Firestore JSON
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
-      uid: json['uid'] ?? '',
-      name: json['name'] ?? '',
-      mobile: json['mobile'] ?? '',
-      email: json['email'] ?? '',
-      city: json['city'] ?? '',
-      referralCode: json['referralCode'],
-      role: json['role'] ?? 'customer',
-      createdAt: DateTime.parse(json['createdAt']),
+      uid: json['uid']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      mobile: json['mobile']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      city: json['city']?.toString() ?? '',
+      referralCode: json['referralCode']?.toString(),
+      role: json['role']?.toString() ?? 'customer',
+      createdAt: json['createdAt'] != null 
+          ? DateTime.parse(json['createdAt'].toString())
+          : DateTime.now(),
       updatedAt: json['updatedAt'] != null 
-          ? DateTime.parse(json['updatedAt']) 
+          ? DateTime.parse(json['updatedAt'].toString())
           : null,
     );
   }

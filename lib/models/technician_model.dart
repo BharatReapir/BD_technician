@@ -16,6 +16,22 @@ DateTime _parseDate(dynamic value) {
   return DateTime.now();
 }
 
+int _toInt(dynamic value) {
+  if (value == null) return 0;
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  if (value is String) return int.tryParse(value) ?? 0;
+  return 0;
+}
+
+double _toDouble(dynamic value) {
+  if (value == null) return 0.0;
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  if (value is String) return double.tryParse(value) ?? 0.0;
+  return 0.0;
+}
+
 class TechnicianModel {
   final String uid;
   final String name;
@@ -73,19 +89,19 @@ class TechnicianModel {
 
   factory TechnicianModel.fromJson(Map<String, dynamic> json) {
     return TechnicianModel(
-      uid: json['uid'] ?? '',
-      name: json['name'] ?? '',
-      mobile: json['mobile'] ?? '',
-      email: json['email'] ?? '',
-      city: json['city'] ?? '',
-      primaryPincode: json['primaryPincode'] ?? '', // 🔑 NEW
-      fcmToken: json['fcmToken'], // 🔑 NEW
+      uid: json['uid']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      mobile: json['mobile']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      city: json['city']?.toString() ?? '',
+      primaryPincode: json['primaryPincode']?.toString() ?? '', // ✅ FIX: Convert to string
+      fcmToken: json['fcmToken']?.toString(), // ✅ FIX: Convert to string
       specializations: List<String>.from(json['specializations'] ?? []),
-      isOnline: json['isOnline'] ?? false,
-      totalJobs: json['totalJobs'] ?? 0,
-      rating: (json['rating'] ?? 0).toDouble(),
-      walletBalance: (json['walletBalance'] ?? 0).toDouble(),
-      profileImage: json['profileImage'],
+      isOnline: json['isOnline'] == true || json['isOnline'] == 'true',
+      totalJobs: _toInt(json['totalJobs']),
+      rating: _toDouble(json['rating']),
+      walletBalance: _toDouble(json['walletBalance']),
+      profileImage: json['profileImage']?.toString(),
       createdAt: _parseDate(json['createdAt']),
       updatedAt: json['updatedAt'] != null
           ? _parseDate(json['updatedAt'])

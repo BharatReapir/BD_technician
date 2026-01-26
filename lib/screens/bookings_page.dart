@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:provider/provider.dart';
 import '../constants/colors.dart';
 import '../models/booking_model.dart';
@@ -16,96 +17,31 @@ class BookingsPage extends StatefulWidget {
 
 class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<BookingModel> _allBookings = [];
-  bool _isLoading = true;
+  DateTime? _lastRefresh;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadBookings();
+    _lastRefresh = DateTime.now();
   }
 
-  Future<void> _loadBookings() async {
-    setState(() {
-      _isLoading = true;
-    });
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Force refresh when returning to this page
+    _forceRefreshIfNeeded();
+  }
 
-    try {
-      final authProvider = Provider.of<auth_provider.AuthProvider>(context, listen: false);
-      final currentUser = authProvider.user;
-      
-      if (currentUser == null) {
-        debugPrint('❌ No user logged in');
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-
-      debugPrint('👤 Current user ID: ${currentUser.uid}');
-      debugPrint('📥 Loading bookings for user: ${currentUser.uid}');
-      
-      // Get bookings from Firebase
-      final bookings = await FirebaseService.getUserBookings(currentUser.uid);
-      
-      debugPrint('✅ Loaded ${bookings.length} bookings');
-      for (var booking in bookings) {
-        debugPrint('  - ${booking.service} | ${booking.status} | ${booking.scheduledTime}');
-      }
-      
-      setState(() {
-        _allBookings = bookings;
-        _isLoading = false;
-      });
-
-      // Credit coins for completed bookings
-      await _creditCoinsForCompletedBookings();
-      
-    } catch (e, stackTrace) {
-      debugPrint('❌ Error loading bookings: $e');
-      debugPrint('Stack trace: $stackTrace');
-      setState(() {
-        _isLoading = false;
-      });
-      
+  void _forceRefreshIfNeeded() {
+    final now = DateTime.now();
+    if (_lastRefresh == null || now.difference(_lastRefresh!).inSeconds > 5) {
+      debugPrint('🔄 Force refreshing bookings page...');
+      _lastRefresh = now;
+      // Trigger a rebuild to refresh the stream
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to load bookings: $e'),
-            backgroundColor: AppColors.primary,
-            action: SnackBarAction(
-              label: 'Retry',
-              textColor: Colors.white,
-              onPressed: _loadBookings,
-            ),
-          ),
-        );
+        setState(() {});
       }
-    }
-  }
-
-  Future<void> _creditCoinsForCompletedBookings() async {
-    if (!mounted) return;
-
-    try {
-      final coinProvider = context.read<CoinProvider>();
-
-      for (final booking in _allBookings) {
-        if (booking.status == 'completed') {
-          final coins = _calculateCoins(booking.totalAmount);
-
-          debugPrint('💰 Attempting to credit $coins coins for booking ${booking.id}');
-
-          await coinProvider.creditCoins(
-            bookingId: booking.id,
-            coins: coins,
-            bookingNumber: 1, // You can track this separately if needed
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('❌ Error crediting coins: $e');
     }
   }
 
@@ -117,18 +53,113 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
     return 10;
   }
 
-  List<BookingModel> _getUpcomingBookings() {
-    return _allBookings
-        .where((b) => b.status == 'pending' || b.status == 'accepted' || b.status == 'in_progress')
+  Future<void> _testFirebaseConnection(String userId) async {
+    try {
+      debugPrint('🧪 === FIREBASE DEBUG TEST ===');
+      debugPrint('🧪 AuthProvider user ID: $userId');
+      
+      // Test 1: Check Firebase Auth current user
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      debugPrint('🧪 Firebase Auth user ID: ${firebaseUser?.uid}');
+      debugPrint('🧪 Firebase Auth email: ${firebaseUser?.email}');
+      debugPrint('🧪 Firebase Auth phone: ${firebaseUser?.phoneNumber}');
+      debugPrint('🧪 User ID match: ${firebaseUser?.uid == userId}');
+      
+      // Test 2: Direct fetch using FirebaseService (this should work)
+      debugPrint('🧪 Testing direct fetch via FirebaseService...');
+      final directBookings = await FirebaseService.getUserBookings(userId);
+      debugPrint('🧪 Direct fetch result: ${directBookings.length} bookings');
+      
+      for (var booking in directBookings) {
+        debugPrint('🧪   - ${booking.service} | ${booking.status} | User: ${booking.userId} | ID: ${booking.id} | Created: ${booking.createdAt}');
+      }
+      
+      // Test 3: Check if the stream is working
+      debugPrint('🧪 Testing stream...');
+      final streamBookings = await FirebaseService.streamUserBookings(userId).first;
+      debugPrint('🧪 Stream result: ${streamBookings.length} bookings');
+      
+      for (var booking in streamBookings) {
+        debugPrint('🧪 Stream - ${booking.service} | ${booking.status} | Created: ${booking.createdAt}');
+      }
+      
+      // Test 4: Check specific status filtering
+      final upcomingFromDirect = _getUpcomingBookings(directBookings);
+      final upcomingFromStream = _getUpcomingBookings(streamBookings);
+      debugPrint('🧪 Upcoming from direct: ${upcomingFromDirect.length}');
+      debugPrint('🧪 Upcoming from stream: ${upcomingFromStream.length}');
+      
+      // Test 5: Check for recent bookings (last 24 hours)
+      final now = DateTime.now();
+      final recent = directBookings.where((b) => 
+        now.difference(b.createdAt).inHours < 24
+      ).toList();
+      debugPrint('🧪 Recent bookings (24h): ${recent.length}');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Debug: Direct=${directBookings.length}, Stream=${streamBookings.length}, Recent=${recent.length}'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('🧪 Test failed: $e');
+      debugPrint('🧪 Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Debug Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  List<BookingModel> _getUpcomingBookings(List<BookingModel> bookings) {
+    return bookings
+        .where((b) => 
+            b.status == 'pending' || 
+            b.status == 'confirmed' ||  // ✅ ADD: Pay Later bookings
+            b.status == 'accepted' || 
+            b.status == 'in_progress')
         .toList();
   }
 
-  List<BookingModel> _getCompletedBookings() {
-    return _allBookings.where((b) => b.status == 'completed').toList();
+  List<BookingModel> _getCompletedBookings(List<BookingModel> bookings) {
+    return bookings.where((b) => b.status == 'completed').toList();
   }
 
-  List<BookingModel> _getCancelledBookings() {
-    return _allBookings.where((b) => b.status == 'cancelled').toList();
+  List<BookingModel> _getCancelledBookings(List<BookingModel> bookings) {
+    return bookings.where((b) => b.status == 'cancelled').toList();
+  }
+
+  Future<void> _creditCoinsForCompletedBookings(List<BookingModel> bookings) async {
+    if (!mounted) return;
+
+    try {
+      final coinProvider = context.read<CoinProvider>();
+
+      for (final booking in bookings) {
+        if (booking.status == 'completed') {
+          final coins = _calculateCoins(booking.totalAmount);
+
+          debugPrint('💰 Attempting to credit $coins coins for booking ${booking.id}');
+
+          await coinProvider.creditCoins(
+            bookingId: booking.id,
+            coins: coins,
+            bookingNumber: 1,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error crediting coins: $e');
+    }
   }
 
   @override
@@ -139,47 +170,165 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        title: const Text(
-          'My Bookings',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _loadBookings,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: [
-            Tab(text: 'Upcoming (${_getUpcomingBookings().length})'),
-            Tab(text: 'Completed (${_getCompletedBookings().length})'),
-            Tab(text: 'Cancelled (${_getCancelledBookings().length})'),
-          ],
-        ),
-      ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: AppColors.primary,
-              ),
-            )
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildBookingsList(_getUpcomingBookings(), 'upcoming'),
-                _buildBookingsList(_getCompletedBookings(), 'completed'),
-                _buildBookingsList(_getCancelledBookings(), 'cancelled'),
-              ],
+    return Consumer<auth_provider.AuthProvider>(
+      builder: (context, authProvider, child) {
+        final currentUser = authProvider.user;
+        
+        debugPrint('🔍 Current user: ${currentUser?.uid}');
+        debugPrint('🔍 User name: ${currentUser?.name}');
+        
+        if (currentUser == null) {
+          return Scaffold(
+            backgroundColor: Colors.white,
+            appBar: AppBar(
+              backgroundColor: AppColors.primary,
+              title: const Text('My Bookings', style: TextStyle(color: Colors.white)),
             ),
+            body: const Center(
+              child: Text('Please login to view bookings'),
+            ),
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            backgroundColor: AppColors.primary,
+            elevation: 0,
+            title: const Text(
+              'My Bookings',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                onPressed: () {
+                  debugPrint('🔄 Manual refresh triggered');
+                  setState(() {
+                    _lastRefresh = DateTime.now();
+                  });
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.bug_report, color: Colors.white),
+                onPressed: () => _testFirebaseConnection(currentUser.uid),
+              ),
+            ],
+          ),
+          body: StreamBuilder<List<BookingModel>>(
+            stream: FirebaseService.streamUserBookings(currentUser.uid),
+            builder: (context, snapshot) {
+              debugPrint('📱 Bookings stream state: ${snapshot.connectionState}');
+              debugPrint('📱 Has data: ${snapshot.hasData}');
+              debugPrint('📱 Data length: ${snapshot.data?.length ?? 0}');
+              debugPrint('📱 Error: ${snapshot.error}');
+              
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                );
+              }
+              
+              if (snapshot.hasError) {
+                debugPrint('❌ Stream error: ${snapshot.error}');
+                
+                // Check if it's a permission error
+                final errorStr = snapshot.error.toString().toLowerCase();
+                final isPermissionError = errorStr.contains('permission') || 
+                                        errorStr.contains('denied') ||
+                                        errorStr.contains('unauthorized');
+                
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isPermissionError ? Icons.security : Icons.error_outline, 
+                        size: 64, 
+                        color: Colors.red
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        isPermissionError 
+                          ? 'Permission Error\nTrying to reconnect...'
+                          : 'Connection Error',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${snapshot.error}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              setState(() {}); // Trigger rebuild to retry
+                            },
+                            child: const Text('Retry'),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: () => _testFirebaseConnection(currentUser.uid),
+                            child: const Text('Debug'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              }
+              
+              final allBookings = snapshot.data ?? [];
+              debugPrint('📋 All bookings: ${allBookings.length}');
+              for (var booking in allBookings) {
+                debugPrint('  - ${booking.service} | ${booking.status} | ID: ${booking.id} | Created: ${booking.createdAt}');
+              }
+              
+              final upcomingBookings = _getUpcomingBookings(allBookings);
+              final completedBookings = _getCompletedBookings(allBookings);
+              final cancelledBookings = _getCancelledBookings(allBookings);
+              
+              debugPrint('📊 Upcoming: ${upcomingBookings.length}, Completed: ${completedBookings.length}, Cancelled: ${cancelledBookings.length}');
+              
+              // Credit coins for completed bookings
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _creditCoinsForCompletedBookings(allBookings);
+              });
+              
+              return Column(
+                children: [
+                  TabBar(
+                    controller: _tabController,
+                    indicatorColor: AppColors.primary,
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor: Colors.grey,
+                    tabs: [
+                      Tab(text: 'Upcoming (${upcomingBookings.length})'),
+                      Tab(text: 'Completed (${completedBookings.length})'),
+                      Tab(text: 'Cancelled (${cancelledBookings.length})'),
+                    ],
+                  ),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildBookingsList(upcomingBookings, 'upcoming'),
+                        _buildBookingsList(completedBookings, 'completed'),
+                        _buildBookingsList(cancelledBookings, 'cancelled'),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -225,7 +374,10 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
     }
 
     return RefreshIndicator(
-      onRefresh: _loadBookings,
+      onRefresh: () async {
+        // Trigger a rebuild to refresh the stream
+        setState(() {});
+      },
       color: AppColors.primary,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
@@ -247,6 +399,10 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
       case 'pending':
         statusColor = Colors.orange;
         statusText = 'PENDING';
+        break;
+      case 'confirmed':
+        statusColor = Colors.blue;
+        statusText = 'CONFIRMED';
         break;
       case 'accepted':
         statusColor = Colors.blue;
@@ -588,8 +744,8 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
         ),
       );
       
-      // Reload bookings
-      await _loadBookings();
+      // Reload bookings by triggering stream refresh
+      setState(() {});
     } catch (e) {
       debugPrint('❌ Error cancelling booking: $e');
       ScaffoldMessenger.of(context).showSnackBar(

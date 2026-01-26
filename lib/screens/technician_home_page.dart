@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_database/firebase_database.dart';
 import '../constants/colors.dart';
 import '../providers/auth_provider.dart';
 import '../services/wallet_service.dart';
@@ -20,7 +22,6 @@ class TechnicianHomePage extends StatefulWidget {
 }
 
 class _TechnicianHomePageState extends State<TechnicianHomePage> {
-  final WalletService _walletService = WalletService();
   int _currentIndex = 0;
 
   @override
@@ -204,24 +205,133 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                       ),
                     ),
                     Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        children: [
-                          _buildJobCard(
-                            context,
-                            currentTechnician,
-                            'AC Service & Repair',
-                            'MG Road, Mumbai',
-                            '09:00 AM - 11:00 AM',
-                            '₹1,299',
-                            'Priya Sharma',
-                            'AC Repair',
-                            '₹900',
-                            'job_001',
-                            '+91 98765 43210',
-                            '123, MG Road, Mumbai',
-                          ),
-                        ],
+                      child: StreamBuilder<List<BookingModel>>(
+                        stream: FirebaseService.streamPendingBookingsForTechnician(
+                          pincode: currentTechnician.primaryPincode,
+                          specializations: currentTechnician.specializations,
+                        ),
+                        builder: (context, snapshot) {
+                          debugPrint('🔧 === TECHNICIAN JOB STREAM DEBUG ===');
+                          debugPrint('🔧 Technician: ${currentTechnician.name}');
+                          debugPrint('🔧 Technician Pincode: ${currentTechnician.primaryPincode}');
+                          debugPrint('🔧 Technician Specializations: ${currentTechnician.specializations}');
+                          debugPrint('🔧 Stream State: ${snapshot.connectionState}');
+                          debugPrint('🔧 Has Error: ${snapshot.hasError}');
+                          debugPrint('🔧 Error: ${snapshot.error}');
+                          debugPrint('🔧 Has Data: ${snapshot.hasData}');
+                          debugPrint('🔧 Jobs Count: ${snapshot.data?.length ?? 0}');
+                          
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+                          
+                          if (snapshot.hasError) {
+                            debugPrint('❌ Stream error: ${snapshot.error}');
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.error, size: 64, color: Colors.red),
+                                  const SizedBox(height: 16),
+                                  Text('Error: ${snapshot.error}'),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      setState(() {}); // Trigger rebuild
+                                    },
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          
+                          final bookings = snapshot.data ?? [];
+                          debugPrint('📋 Found ${bookings.length} jobs for technician');
+                          
+                          for (var booking in bookings) {
+                            debugPrint('  📋 Job: ${booking.service} | Pincode: ${booking.pincode} | Status: ${booking.status} | ID: ${booking.id}');
+                            debugPrint('      Created: ${booking.createdAt} | Scheduled: ${booking.scheduledTime}');
+                          }
+                          
+                          if (bookings.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.work_off,
+                                    size: 64,
+                                    color: Colors.grey,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'No jobs available in your area',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Pincode: ${currentTechnician.primaryPincode}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Services: ${currentTechnician.specializations.join(", ")}',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      ElevatedButton(
+                                        onPressed: () => _debugBookings(currentTechnician),
+                                        child: const Text('Debug Jobs'),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      ElevatedButton(
+                                        onPressed: () => _fixBookingPincodes(),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.orange,
+                                        ),
+                                        child: const Text('Fix Pincodes'),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ElevatedButton(
+                                        onPressed: () => _fixServiceNames(),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.purple,
+                                        ),
+                                        child: const Text('Fix Services'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+                          
+                          return ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: bookings.length,
+                            itemBuilder: (context, index) {
+                              final booking = bookings[index];
+                              return _buildRealJobCard(
+                                context,
+                                currentTechnician,
+                                booking,
+                              );
+                            },
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -562,25 +672,13 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     );
   }
 
-  Widget _buildJobCard(
+  Widget _buildRealJobCard(
     BuildContext context,
     TechnicianModel technician,
-    String title,
-    String location,
-    String time,
-    String totalPrice,
-    String customerName,
-    String service,
-    String earnings,
-    String jobId,
-    String customerPhone,
-    String customerAddress,
+    BookingModel booking,
   ) {
-    final calculatedEarnings = CommissionCalculator.getTechnicianEarnings(
-        double.tryParse(totalPrice.replaceAll('₹', '').replaceAll(',', '')) ?? 0);
-    final commissionText = CommissionCalculator.formatCommissionText(
-        double.tryParse(totalPrice.replaceAll('₹', '').replaceAll(',', '')) ?? 0);
-
+    final calculatedEarnings = CommissionCalculator.getTechnicianEarnings(booking.totalAmount);
+    
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       elevation: 4,
@@ -606,7 +704,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        title,
+                        booking.service,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -615,11 +713,20 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        location,
+                        'Pincode: ${booking.pincode}',
                         style: const TextStyle(
                           color: Colors.white70,
                           fontSize: 14,
                         ),
+                      ),
+                      Text(
+                        booking.address ?? 'Address not available',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -631,7 +738,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    time,
+                    booking.scheduledTime,
                     style: const TextStyle(
                       color: AppColors.primary,
                       fontSize: 12,
@@ -651,7 +758,18 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   children: [
                     const Text('Customer:', style: TextStyle(fontSize: 14)),
                     Text(
-                      customerName,
+                      booking.userName,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Total Amount:', style: TextStyle(fontSize: 14)),
+                    Text(
+                      '₹${booking.totalAmount.toStringAsFixed(0)}',
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ],
@@ -671,15 +789,26 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Booking ID:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text(
+                      booking.id?.substring(0, 8) ?? 'N/A',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () {},
+                        onPressed: () => _rejectBooking(booking.id!, technician.uid),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.primary,
-                          side: const BorderSide(color: AppColors.primary, width: 2),
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red, width: 2),
                         ),
                         child: const Text('Reject'),
                       ),
@@ -687,7 +816,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () {},
+                        onPressed: () => _acceptBooking(booking.id!, technician.uid, technician.name),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           foregroundColor: Colors.white,
@@ -704,4 +833,323 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       ),
     );
   }
+
+  Future<void> _acceptBooking(String bookingId, String technicianId, String technicianName) async {
+    try {
+      debugPrint('🟢 Technician accepting booking: $bookingId');
+      
+      // Store context reference
+      final context = this.context;
+      
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+      
+      // Accept the booking
+      await FirebaseService.acceptBooking(bookingId, technicianId);
+      
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Booking accepted successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+      
+      debugPrint('✅ Booking accepted successfully');
+    } catch (e) {
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Failed to accept booking: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      
+      debugPrint('❌ Error accepting booking: $e');
+    }
+  }
+
+  Future<void> _fixServiceNames() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Fixing service names...'),
+            ],
+          ),
+        ),
+      );
+      
+      // Get all bookings and fix service names
+      final database = FirebaseDatabase.instanceFor(
+        app: Firebase.app(),
+        databaseURL: 'https://bharatapp-4e9c8-default-rtdb.asia-southeast1.firebasedatabase.app/',
+      );
+      
+      final snapshot = await database.ref('bookings').get();
+      if (!snapshot.exists || snapshot.value == null) {
+        if (mounted) Navigator.of(context).pop();
+        return;
+      }
+      
+      final bookingsMap = Map<String, dynamic>.from(snapshot.value as Map);
+      int fixedCount = 0;
+      
+      // Service name fixes
+      final serviceFixes = {
+        'General Service': 'AC Repair',
+        'AC Installation': 'AC Repair', 
+        'AC Service': 'AC Repair',
+        'Jet Machine Service': 'Appliance Repair',
+      };
+      
+      for (final entry in bookingsMap.entries) {
+        final bookingId = entry.key;
+        final bookingData = Map<String, dynamic>.from(entry.value);
+        final currentService = bookingData['service']?.toString() ?? '';
+        
+        if (serviceFixes.containsKey(currentService)) {
+          final newService = serviceFixes[currentService]!;
+          
+          await database.ref('bookings/$bookingId').update({
+            'service': newService,
+            'updatedAt': DateTime.now().toIso8601String(),
+          });
+          
+          debugPrint('✅ Fixed booking $bookingId: $currentService → $newService');
+          fixedCount++;
+        }
+      }
+      
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Fixed $fixedCount service names! Jobs should appear now.'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        
+        // Trigger a refresh
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error fixing services: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _fixBookingPincodes() async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Fixing booking pincodes...'),
+            ],
+          ),
+        ),
+      );
+      
+      await FirebaseService.fixBookingPincodes();
+      
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Booking pincodes fixed! Jobs should appear now.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        // Trigger a refresh
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error fixing pincodes: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _debugBookings(TechnicianModel technician) async {
+    try {
+      debugPrint('🔍 === MANUAL BOOKING DEBUG ===');
+      debugPrint('🔍 Technician: ${technician.name}');
+      debugPrint('🔍 Technician Pincode: ${technician.primaryPincode}');
+      debugPrint('🔍 Technician Specializations: ${technician.specializations}');
+      
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+      
+      // Get all bookings from Firebase to debug
+      final database = FirebaseDatabase.instanceFor(
+        app: Firebase.app(),
+        databaseURL: 'https://bharatapp-4e9c8-default-rtdb.asia-southeast1.firebasedatabase.app/',
+      );
+      final snapshot = await database.ref('bookings').get();
+      
+      if (snapshot.exists && snapshot.value != null) {
+        final bookingsMap = Map<String, dynamic>.from(snapshot.value as Map);
+        debugPrint('📊 Total bookings in database: ${bookingsMap.length}');
+        
+        final allBookings = bookingsMap.entries
+            .map((entry) {
+              final bookingData = Map<String, dynamic>.from(entry.value);
+              bookingData['id'] = entry.key;
+              return BookingModel.fromJson(bookingData);
+            })
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        
+        // Filter recent bookings (last 24 hours)
+        final now = DateTime.now();
+        final recentBookings = allBookings.where((b) => 
+          now.difference(b.createdAt).inHours < 24
+        ).toList();
+        
+        debugPrint('📅 Recent bookings (24h): ${recentBookings.length}');
+        
+        for (var booking in recentBookings) {
+          debugPrint('  📋 ${booking.service} | Status: ${booking.status} | Pincode: ${booking.pincode}');
+          debugPrint('      Created: ${booking.createdAt} | Scheduled: ${booking.scheduledTime}');
+          debugPrint('      ID: ${booking.id}');
+        }
+        
+        // Check matches for this technician
+        final matchingBookings = recentBookings.where((booking) {
+          final statusMatch = booking.status == 'pending' || booking.status == 'confirmed';
+          final pincodeMatch = booking.pincode == technician.primaryPincode;
+          final serviceMatch = technician.specializations.contains(booking.service);
+          return statusMatch && pincodeMatch && serviceMatch;
+        }).toList();
+        
+        debugPrint('🎯 Matching bookings for ${technician.name}: ${matchingBookings.length}');
+        
+        if (mounted) {
+          Navigator.of(context).pop(); // Close loading
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Debug: Total=${allBookings.length}, Recent=${recentBookings.length}, Matching=${matchingBookings.length}'),
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          Navigator.of(context).pop(); // Close loading
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No bookings found in database'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Debug error: $e');
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Debug error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _rejectBooking(String bookingId, String technicianId) async {
+    try {
+      debugPrint('🔴 Technician rejecting booking: $bookingId');
+      
+      // Store context reference
+      final context = this.context;
+      
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+      
+      // Reject the booking
+      await FirebaseService.rejectBooking(bookingId, technicianId);
+      
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Booking rejected'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      
+      debugPrint('✅ Booking rejected successfully');
+    } catch (e) {
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Failed to reject booking: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      
+      debugPrint('❌ Error rejecting booking: $e');
+    }
+  }
+
 }

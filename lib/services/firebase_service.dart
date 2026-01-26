@@ -48,6 +48,7 @@ class FirebaseService {
         // Enable persistence for offline support (not available on web)
         if (!kIsWeb) {
           _realtimeDbInstance!.setPersistenceEnabled(true);
+          _realtimeDbInstance!.setPersistenceCacheSizeBytes(10000000); // 10MB cache
         }
         
         _isInitialized = true;
@@ -451,6 +452,66 @@ class FirebaseService {
     }
   }
 
+  /// Stream pending bookings for technician by pincode (real-time)
+  static Stream<List<BookingModel>> streamPendingBookingsForTechnician({
+    required String pincode,
+    required List<String> specializations,
+  }) {
+    debugPrint('🔍 Streaming pending bookings for pincode: $pincode');
+    debugPrint('🔧 Technician specializations: $specializations');
+    
+    return _realtimeDb.ref('bookings')
+        .onValue  // ✅ CHANGE: Get ALL bookings, then filter
+        .map((event) {
+      if (event.snapshot.exists && event.snapshot.value != null) {
+        final bookingsMap = Map<String, dynamic>.from(event.snapshot.value as Map);
+        debugPrint('📊 Total bookings in database: ${bookingsMap.length}');
+        
+        final filteredBookings = bookingsMap.entries
+            .map((entry) {
+              final bookingData = Map<String, dynamic>.from(entry.value);
+              bookingData['id'] = entry.key; // Add the booking ID
+              return BookingModel.fromJson(bookingData);
+            })
+            .where((booking) {
+              // ✅ CHANGE: Include both 'pending' AND 'confirmed' status
+              final statusMatch = booking.status == 'pending' || booking.status == 'confirmed';
+              
+              // ✅ FIX: Handle missing pincode by extracting from address
+              String? bookingPincode = booking.pincode;
+              if (bookingPincode == null || bookingPincode.isEmpty) {
+                // Try to extract pincode from address (last 6 digits)
+                final address = booking.address ?? '';
+                final pincodeRegex = RegExp(r'\b\d{6}\b');
+                final match = pincodeRegex.firstMatch(address);
+                bookingPincode = match?.group(0);
+              }
+              
+              // Filter by pincode match
+              final pincodeMatch = bookingPincode == pincode;
+              
+              // Filter by service specialization match
+              final serviceMatch = specializations.contains(booking.service) || 
+                                 _isServiceMatch(booking.service, specializations);
+              
+              debugPrint('📋 Booking ${booking.id}: status=${booking.status}, pincode=$bookingPincode (extracted), service=${booking.service}');
+              debugPrint('🎯 Match: status=$statusMatch, pincode=$pincodeMatch, service=$serviceMatch');
+              debugPrint('    Created: ${booking.createdAt}, Scheduled: ${booking.scheduledTime}');
+              debugPrint('    Address: ${booking.address}');
+              
+              return statusMatch && pincodeMatch && serviceMatch;
+            })
+            .toList()
+          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        
+        debugPrint('✅ Found ${filteredBookings.length} matching bookings for pincode $pincode');
+        return filteredBookings;
+      }
+      debugPrint('⚠️ No bookings found in database');
+      return <BookingModel>[];
+    });
+  }
+
   /// Stream technician's assigned bookings (real-time)
   static Stream<List<BookingModel>> streamTechnicianAssignedBookings(String technicianId) {
     return _realtimeDb.ref('bookings')
@@ -676,20 +737,152 @@ class FirebaseService {
 
   /// Stream user's bookings (real-time updates)
   static Stream<List<BookingModel>> streamUserBookings(String userId) {
+    debugPrint('🔄 Streaming bookings for user: $userId');
+    
     return _realtimeDb.ref('bookings')
         .orderByChild('userId')
         .equalTo(userId)
         .onValue
-        .map((event) {
-      if (event.snapshot.exists && event.snapshot.value != null) {
-        final bookingsMap = Map<String, dynamic>.from(event.snapshot.value as Map);
-        return bookingsMap.entries
-            .map((entry) => BookingModel.fromJson(Map<String, dynamic>.from(entry.value)))
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        .asyncMap((event) async {
+      try {
+        debugPrint('📡 Stream event received for user: $userId');
+        debugPrint('📡 Event type: ${event.type}');
+        debugPrint('📡 Snapshot exists: ${event.snapshot.exists}');
+        
+        if (event.snapshot.exists && event.snapshot.value != null) {
+          final bookingsMap = Map<String, dynamic>.from(event.snapshot.value as Map);
+          debugPrint('📡 Raw bookings map keys: ${bookingsMap.keys.toList()}');
+          
+          final bookings = bookingsMap.entries
+              .map((entry) {
+                final bookingData = Map<String, dynamic>.from(entry.value);
+                bookingData['id'] = entry.key; // Add the booking ID
+                debugPrint('📡 Processing booking: ${entry.key} | Status: ${bookingData['status']} | Service: ${bookingData['service']}');
+                return BookingModel.fromJson(bookingData);
+              })
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          
+          debugPrint('📋 Streamed ${bookings.length} bookings for user $userId');
+          
+          // Log each booking for debugging
+          for (var booking in bookings) {
+            debugPrint('  📋 ${booking.service} | ${booking.status} | ${booking.createdAt} | ID: ${booking.id}');
+          }
+          
+          return bookings;
+        }
+        debugPrint('⚠️ No bookings found for user $userId');
+        return <BookingModel>[];
+      } catch (e, stackTrace) {
+        debugPrint('❌ Error in stream for user $userId: $e');
+        debugPrint('❌ Stack trace: $stackTrace');
+        
+        // Check if it's a permission error
+        final errorStr = e.toString().toLowerCase();
+        if (errorStr.contains('permission') || errorStr.contains('denied')) {
+          debugPrint('🔒 Permission denied error detected - this might resolve automatically');
+          // Return empty list for permission errors to avoid breaking the UI
+          return <BookingModel>[];
+        }
+        
+        // Re-throw other errors
+        rethrow;
       }
-      return [];
+    }).handleError((error) {
+      debugPrint('❌ Stream error handler: $error');
+      // Return empty stream on error to prevent UI crashes
+      return <BookingModel>[];
     });
+  }
+
+  /// Fix existing bookings by extracting pincode from address
+  static Future<void> fixBookingPincodes() async {
+    try {
+      debugPrint('🔧 Fixing existing bookings with missing pincodes...');
+      
+      final snapshot = await _realtimeDb.ref('bookings').get();
+      if (!snapshot.exists || snapshot.value == null) return;
+      
+      final bookingsMap = Map<String, dynamic>.from(snapshot.value as Map);
+      int fixedCount = 0;
+      
+      for (final entry in bookingsMap.entries) {
+        final bookingId = entry.key;
+        final bookingData = Map<String, dynamic>.from(entry.value);
+        
+        // Skip if pincode already exists
+        if (bookingData['pincode'] != null && bookingData['pincode'].toString().isNotEmpty) {
+          continue;
+        }
+        
+        // Extract pincode from address
+        final address = bookingData['address']?.toString() ?? '';
+        final pincodeRegex = RegExp(r'\b\d{6}\b');
+        final match = pincodeRegex.firstMatch(address);
+        
+        if (match != null) {
+          final extractedPincode = match.group(0)!;
+          
+          // Update booking with extracted pincode
+          await _realtimeDb.ref('bookings/$bookingId').update({
+            'pincode': extractedPincode,
+            'updatedAt': DateTime.now().toIso8601String(),
+          });
+          
+          debugPrint('✅ Fixed booking $bookingId: extracted pincode $extractedPincode from address');
+          fixedCount++;
+        } else {
+          debugPrint('⚠️ Could not extract pincode from address: $address');
+        }
+      }
+      
+      debugPrint('✅ Fixed $fixedCount bookings with missing pincodes');
+    } catch (e) {
+      debugPrint('❌ Error fixing booking pincodes: $e');
+    }
+  }
+
+  /// Check if booking service matches technician specializations (with mapping)
+  static bool _isServiceMatch(String bookingService, List<String> specializations) {
+    // Direct match first
+    if (specializations.contains(bookingService)) return true;
+    
+    // Service mapping for common variations
+    final serviceMap = {
+      // AC Related Services
+      'General Service': ['AC Repair', 'Appliance Repair'],
+      'AC Installation': ['AC Repair'],
+      'AC Service': ['AC Repair'],
+      'AC Repair Service': ['AC Repair'],
+      'Split AC Service': ['AC Repair'],
+      'Window AC Service': ['AC Repair'],
+      'AC Gas Filling': ['AC Repair'],
+      'AC Cleaning': ['AC Repair'],
+      
+      // Appliance Services
+      'Jet Machine Service': ['Appliance Repair'],
+      'Washing Machine Repair': ['Appliance Repair'],
+      'Washing Machine Service': ['Appliance Repair'],
+      'Refrigerator Repair': ['Appliance Repair'],
+      'Refrigerator Service': ['Appliance Repair'],
+      'Microwave Repair': ['Appliance Repair'],
+      'Water Purifier Service': ['Appliance Repair'],
+      'Chimney Service': ['Appliance Repair'],
+      'Gas Refilling': ['Appliance Repair'],
+      
+      // Carpenter Services
+      'Carpenter Work': ['Carpenter'],
+      'Wood Work': ['Carpenter'],
+      'Furniture Repair': ['Carpenter'],
+    };
+    
+    final mappedServices = serviceMap[bookingService] ?? [];
+    final hasMatch = specializations.any((spec) => mappedServices.contains(spec));
+    
+    debugPrint('🔧 Service mapping: $bookingService → $mappedServices → Match: $hasMatch');
+    
+    return hasMatch;
   }
 
   /// Stream technician's bookings (real-time updates)

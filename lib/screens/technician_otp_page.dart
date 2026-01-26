@@ -77,12 +77,16 @@ class _TechnicianOTPPageState extends State<TechnicianOTPPage> {
       debugPrint('🔐 Verifying OTP: $otp');
       debugPrint('📱 Phone number: ${widget.phoneNumber}');
       
+      // Check user type before verification
+      final prefs = await SharedPreferences.getInstance();
+      final userType = prefs.getString('userType') ?? 'user';
+      debugPrint('👤 Current user type: $userType');
+      
       final userCredential = await authProvider.verifyOTP(otp);
       final uid = userCredential.user!.uid;
       debugPrint('✅ OTP Verified for UID: $uid');
 
       // 2. ✅ CONFIRM USER TYPE
-      final prefs = await SharedPreferences.getInstance();
       await prefs.setString('userType', 'technician');
       debugPrint('🔧 User type confirmed: technician');
 

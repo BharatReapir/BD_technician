@@ -3,12 +3,14 @@ import 'package:provider/provider.dart';
 import '../constants/colors.dart';
 import '../providers/auth_provider.dart';
 import '../services/wallet_service.dart';
-import '../services/firebase_service.dart'; // 🔔 NEW: Import FirebaseService
+import '../services/firebase_service.dart';
+import '../services/fcm_service.dart'; // 🔔 NEW: FCM Service
 import '../models/technician_model.dart';
-import '../models/booking_model.dart'; // 🔔 NEW: Import BookingModel
+import '../models/booking_model.dart';
 import '../utils/commission_calculator.dart';
 import 'tech_wallet_page.dart';
-import 'job_details_page.dart'; // Add this import
+import 'job_details_page.dart';
+import 'landing_page.dart';
 
 class TechnicianHomePage extends StatefulWidget {
   const TechnicianHomePage({Key? key}) : super(key: key);
@@ -19,228 +21,391 @@ class TechnicianHomePage extends StatefulWidget {
 
 class _TechnicianHomePageState extends State<TechnicianHomePage> {
   final WalletService _walletService = WalletService();
+  int _currentIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
-        // ✅ Check if user is logged in
         if (!authProvider.isLoggedIn || !authProvider.isTechnician) {
           return const Scaffold(
             body: Center(child: Text('Please login as technician')),
           );
         }
 
-        // ✅ Get technician from AuthProvider
         final technician = authProvider.technician;
-
         if (technician == null) {
           return const Scaffold(
             body: Center(child: Text('No technician data found')),
           );
         }
 
-        // ✅ Stream technician data for real-time updates
         return StreamBuilder<TechnicianModel?>(
           stream: authProvider.technicianStream(technician.uid),
           builder: (context, snapshot) {
-            // Use streamed data if available, otherwise use cached data
             final currentTechnician = snapshot.data ?? technician;
 
             return Scaffold(
-              body: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF0047AB),
-                      Color(0xFF0056C8),
+              body: _currentIndex == 0 
+                  ? _buildHomePage(currentTechnician, authProvider) 
+                  : _buildProfilePage(currentTechnician, authProvider),
+              bottomNavigationBar: _buildBottomNavBar(),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildBottomNavBar() {
+    return BottomNavigationBar(
+      currentIndex: _currentIndex,
+      onTap: (index) {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: AppColors.primary,
+      unselectedItemColor: Colors.grey,
+      items: const [
+        BottomNavigationBarItem(
+          icon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person),
+          label: 'Profile',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHomePage(TechnicianModel currentTechnician, AuthProvider authProvider) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF0047AB),
+            Color(0xFF0056C8),
+          ],
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome, ${currentTechnician.name.split(' ')[0]}!',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Text(
+                        'Ready to work?',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Welcome, ${currentTechnician.name.split(' ')[0]}!',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const Text(
-                                  'Ready to work?',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: currentTechnician.isOnline
-                                    ? Colors.green
-                                    : Colors.grey,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                currentTechnician.isOnline ? 'ONLINE' : 'OFFLINE',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: currentTechnician.isOnline ? Colors.green : Colors.grey,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      currentTechnician.isOnline ? 'ONLINE' : 'OFFLINE',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => TechWalletPage(
-                                        technicianId: currentTechnician.uid,
-                                      ),
-                                    ),
-                                  );
-                                },
-                                child: _buildStatCard(
-                                  '₹${currentTechnician.walletBalance.toStringAsFixed(0)}',
-                                  'Wallet',
-                                  Icons.account_balance_wallet,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildStatCard(
-                                '${currentTechnician.totalJobs}',
-                                'Jobs Done',
-                                Icons.work,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _buildStatCard(
-                                '${currentTechnician.rating.toStringAsFixed(1)}',
-                                'Rating',
-                                Icons.star,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      
-                      // 🔔 NEW: Booking Notifications Section
-                      StreamBuilder<List<BookingModel>>(
-                        stream: FirebaseService.streamTechnicianAssignedBookings(currentTechnician.uid),
-                        builder: (context, bookingSnapshot) {
-                          if (bookingSnapshot.hasData && bookingSnapshot.data!.isNotEmpty) {
-                            final assignedBookings = bookingSnapshot.data!
-                                .where((booking) => booking.status == 'assigned')
-                                .toList();
-                            
-                            if (assignedBookings.isNotEmpty) {
-                              return Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 16),
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.shade100,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.orange, width: 2),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(Icons.notification_important, color: Colors.orange.shade700),
-                                        const SizedBox(width: 8),
-                                        Text(
-                                          'New Booking Assigned!',
-                                          style: TextStyle(
-                                            color: Colors.orange.shade700,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    ...assignedBookings.map((booking) => _buildBookingNotification(booking)),
-                                  ],
-                                ),
-                              );
-                            }
-                          }
-                          return const SizedBox.shrink();
-                        },
-                      ),
-                      
-                      const SizedBox(height: 24),
-                      Expanded(
-                        child: Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(30),
-                              topRight: Radius.circular(30),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TechWalletPage(
+                              technicianId: currentTechnician.uid,
                             ),
                           ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Padding(
-                                padding: EdgeInsets.all(24.0),
-                                child: Text(
-                                  "Today's Jobs (3)",
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                        );
+                      },
+                      child: _buildStatCard(
+                        '₹${currentTechnician.walletBalance.toStringAsFixed(0)}',
+                        'Wallet',
+                        Icons.account_balance_wallet,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildStatCard(
+                      '${currentTechnician.totalJobs}',
+                      'Jobs Done',
+                      Icons.work,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildStatCard(
+                      '${currentTechnician.rating.toStringAsFixed(1)}',
+                      'Rating',
+                      Icons.star,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Expanded(
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: Text(
+                        "Today's Jobs",
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          _buildJobCard(
+                            context,
+                            currentTechnician,
+                            'AC Service & Repair',
+                            'MG Road, Mumbai',
+                            '09:00 AM - 11:00 AM',
+                            '₹1,299',
+                            'Priya Sharma',
+                            'AC Repair',
+                            '₹900',
+                            'job_001',
+                            '+91 98765 43210',
+                            '123, MG Road, Mumbai',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfilePage(TechnicianModel currentTechnician, AuthProvider authProvider) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF0047AB),
+            Color(0xFF0056C8),
+          ],
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 40,
+                    backgroundColor: Colors.white,
+                    child: Text(
+                      currentTechnician.name.isNotEmpty 
+                          ? currentTechnician.name[0].toUpperCase()
+                          : 'T',
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0047AB),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          currentTechnician.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Technician ID: ${currentTechnician.uid.substring(0, 8)}...',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Personal Information',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      _buildProfileItem(
+                        icon: Icons.person,
+                        label: 'Full Name',
+                        value: currentTechnician.name,
+                      ),
+                      
+                      _buildProfileItem(
+                        icon: Icons.email,
+                        label: 'Email',
+                        value: currentTechnician.email,
+                      ),
+                      
+                      _buildProfileItem(
+                        icon: Icons.phone,
+                        label: 'Mobile Number',
+                        value: currentTechnician.mobile,
+                      ),
+                      
+                      _buildProfileItem(
+                        icon: Icons.location_city,
+                        label: 'City',
+                        value: currentTechnician.city,
+                      ),
+                      
+                      _buildProfileItem(
+                        icon: Icons.pin_drop,
+                        label: 'Primary Pincode',
+                        value: currentTechnician.primaryPincode,
+                      ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      const Text(
+                        'Services',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: currentTechnician.specializations.map((service) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: AppColors.primary),
+                            ),
+                            child: Text(
+                              service,
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500,
                               ),
-                              Expanded(
-                                child: ListView(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  children: [
-                                    _buildJobCard(
-                                      context,
-                                      currentTechnician,
-                                      'AC Service & Repair',
-                                      'MG Road, Mumbai',
-                                      '09:00 AM - 11:00 AM',
-                                      '₹1,299', // Updated to show commission structure
-                                      'Priya Sharma',
-                                      'AC Repair',
-                                      '₹900', // This will be recalculated
-                                      'job_001',
-                                      '+91 98765 43210',
-                                      '123, MG Road, Mumbai',
-                                    ),
-                                  ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      
+                      const SizedBox(height: 30),
+                      
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: () => _showLogoutDialog(authProvider),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.logout),
+                              SizedBox(width: 8),
+                              Text(
+                                'Logout',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ],
@@ -251,13 +416,105 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   ),
                 ),
               ),
-              floatingActionButton: FloatingActionButton(
-                onPressed: () {},
-                backgroundColor: Colors.black87,
-                child: const Icon(Icons.help_outline, color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileItem({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: AppColors.primary,
+            size: 24,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutDialog(AuthProvider authProvider) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                );
+                
+                await authProvider.logout();
+                
+                if (mounted) {
+                  Navigator.of(context).pop();
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LandingPage()),
+                    (route) => false,
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
               ),
-            );
-          },
+              child: const Text('Logout'),
+            ),
+          ],
         );
       },
     );
@@ -267,26 +524,37 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          Icon(icon, color: Colors.white, size: 28),
+          Icon(
+            icon,
+            size: 32,
+            color: AppColors.primary,
+          ),
           const SizedBox(height: 8),
           Text(
             value,
             style: const TextStyle(
-              color: Colors.white,
               fontSize: 20,
               fontWeight: FontWeight.bold,
+              color: Colors.black87,
             ),
           ),
           Text(
             label,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
               fontSize: 12,
+              color: Colors.grey.shade600,
             ),
           ),
         ],
@@ -308,106 +576,83 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     String customerPhone,
     String customerAddress,
   ) {
-    // Parse total price to calculate actual earnings and commission
-    final totalAmount = double.tryParse(totalPrice.replaceAll('₹', '').replaceAll(',', '')) ?? 499.0;
-    final calculatedEarnings = CommissionCalculator.getTechnicianEarnings(totalAmount);
-    final commission = CommissionCalculator.getCommission(totalAmount);
-    final commissionText = CommissionCalculator.formatCommissionText(totalAmount);
-    
-    return Container(
+    final calculatedEarnings = CommissionCalculator.getTechnicianEarnings(
+        double.tryParse(totalPrice.replaceAll('₹', '').replaceAll(',', '')) ?? 0);
+    final commissionText = CommissionCalculator.formatCommissionText(
+        double.tryParse(totalPrice.replaceAll('₹', '').replaceAll(',', '')) ?? 0);
+
+    return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              Text(
-                totalPrice,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            location,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontSize: 14,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            children: [
-              Icon(Icons.access_time, size: 16, color: Colors.grey.shade600),
-              const SizedBox(width: 4),
-              Text(
-                time,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              border: Border.all(color: Colors.green, width: 2),
-              borderRadius: BorderRadius.circular(12),
+            decoration: const BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
             ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        location,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    time,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  children: [
-                    const Icon(Icons.notification_important,
-                        color: Colors.orange, size: 20),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'New Job Request!',
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Customer:',
-                      style: TextStyle(fontSize: 14),
-                    ),
+                    const Text('Customer:', style: TextStyle(fontSize: 14)),
                     Text(
                       customerName,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
@@ -415,45 +660,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Total Amount:',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    Text(
-                      totalPrice,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Commission:',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    Text(
-                      commissionText,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Your Earnings:',
-                      style: TextStyle(fontSize: 14),
-                    ),
+                    const Text('Your Earnings:', style: TextStyle(fontSize: 14)),
                     Text(
                       '₹${calculatedEarnings.toStringAsFixed(0)}',
                       style: const TextStyle(
@@ -473,237 +680,25 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
                           side: const BorderSide(color: AppColors.primary, width: 2),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        child: const Text(
-                          'Reject',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: const Text('Reject'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () async {
-                          if (technician.walletBalance < 200) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                    'Insufficient wallet balance. Please recharge.'),
-                                backgroundColor: AppColors.primary,
-                              ),
-                            );
-                            return;
-                          }
-
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (context) => const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                          );
-
-                          bool success = await _walletService.deductBookingAmount(
-                              technician.uid, jobId);
-
-                          Navigator.pop(context);
-
-                          if (success) {
-                            // ✅ Reload technician data to update wallet balance
-                            await context.read<AuthProvider>().reloadData();
-                            
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      'Job accepted! ₹200 deducted from wallet.'),
-                                  backgroundColor: Colors.green,
-                                  duration: Duration(seconds: 1),
-                                ),
-                              );
-
-                              // ✅ Navigate to Job Details page after 1 second
-                              await Future.delayed(const Duration(seconds: 1));
-                              
-                              if (mounted) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => JobDetailsPage(
-                                      jobId: jobId,
-                                      customerName: customerName,
-                                      customerPhone: customerPhone,
-                                      customerAddress: customerAddress,
-                                      service: service,
-                                      timeSlot: time,
-                                      earnings: '₹${calculatedEarnings.toStringAsFixed(0)}',
-                                      commission: commissionText,
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                          } else {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Failed to accept job'),
-                                  backgroundColor: AppColors.primary,
-                                ),
-                              );
-                            }
-                          }
-                        },
+                        onPressed: () {},
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
                         ),
-                        child: const Text(
-                          'Accept',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: const Text('Accept'),
                       ),
                     ),
                   ],
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 🔔 NEW: Booking notification widget
-  Widget _buildBookingNotification(BookingModel booking) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.orange.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                booking.service,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              Text(
-                '₹${booking.totalAmount.toStringAsFixed(0)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            booking.userName,
-            style: const TextStyle(fontSize: 14),
-          ),
-          Text(
-            booking.address ?? 'Address not provided',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () async {
-                    // 🔔 Accept booking
-                    try {
-                      await FirebaseService.acceptBooking(booking.id, booking.userId);
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Booking accepted!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Accept'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () async {
-                    // 🔔 Reject booking
-                    try {
-                      final techId = context.read<AuthProvider>().technician?.uid;
-                      if (techId != null) {
-                        await FirebaseService.rejectBooking(booking.id, techId);
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Booking rejected'),
-                              backgroundColor: Colors.orange,
-                            ),
-                          );
-                        }
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Error: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    side: const BorderSide(color: Colors.red),
-                  ),
-                  child: const Text('Reject'),
-                ),
-              ),
-            ],
           ),
         ],
       ),

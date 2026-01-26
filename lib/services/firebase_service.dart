@@ -371,6 +371,36 @@ class FirebaseService {
     });
   }
 
+  /// Update technician's FCM token
+  static Future<void> updateTechnicianFCMToken(String uid, String fcmToken) async {
+    try {
+      print('🔔 Updating FCM token for technician: $uid');
+      await _realtimeDb.ref('technicians/$uid').update({
+        'fcmToken': fcmToken,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      
+      // Also update in pincode mapping for quick access
+      final techSnapshot = await _realtimeDb.ref('technicians/$uid').get();
+      if (techSnapshot.exists && techSnapshot.value != null) {
+        final techData = Map<String, dynamic>.from(techSnapshot.value as Map);
+        final pincode = techData['primaryPincode'];
+        
+        if (pincode != null) {
+          await _realtimeDb
+              .ref('pincode_map/$pincode/$uid')
+              .update({'fcm': fcmToken});
+          print('✅ FCM token updated in pincode mapping: $pincode');
+        }
+      }
+      
+      print('✅ FCM token updated successfully');
+    } catch (e) {
+      print('❌ Error updating FCM token: $e');
+      rethrow;
+    }
+  }
+
   // ========== BACKEND COMPATIBLE FUNCTIONS ==========
 
   /// Accept booking (technician side) - Matches backend logic

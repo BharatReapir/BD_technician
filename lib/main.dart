@@ -2,19 +2,35 @@ import 'package:bharatapp/constants/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'firebase_options.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/coin_provider.dart';
 import 'screens/landing_page.dart';
 import 'screens/home/home_page.dart';
+import 'services/fcm_service.dart';
+
+// 🔔 Background message handler (must be top-level)
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  debugPrint('🔔 Background message: ${message.messageId}');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // 🔔 Set background message handler
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+  // 🔔 Initialize FCM Service
+  await FCMService.initialize();
 
   runApp(const BharatDoorstepApp());
 }

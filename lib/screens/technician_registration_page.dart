@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../constants/colors.dart';
 import '../providers/auth_provider.dart';
 import '../models/technician_model.dart';
+import '../services/fcm_service.dart'; // 🔔 NEW: FCM Service
 import 'technician_home_page.dart';
 
 class TechnicianRegistrationPage extends StatefulWidget {
@@ -91,15 +92,18 @@ class _TechnicianRegistrationPageState
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
+      // 🔔 Initialize FCM service if not already done
+      await FCMService.initialize();
+      
       // 🔑 STEP 2: Create technician with pincode mapping
       final technician = TechnicianModel(
         uid: FirebaseAuth.instance.currentUser!.uid,
         name: _nameController.text.trim(),
-        mobile: widget.phoneNumber,
+        mobile: widget.phoneNumber, // 🔑 Use phone number from widget
         email: _emailController.text.trim(),
         city: _cityController.text.trim(),
         primaryPincode: _pincodeController.text.trim(), // 🔑 NEW: Primary pincode
-        fcmToken: null, // TODO: Get FCM token
+        fcmToken: await FCMService.getCurrentToken(), // 🔔 NEW: Get FCM token
         specializations: _selectedSpecializations,
         isOnline: true,
         totalJobs: 0,
@@ -108,20 +112,28 @@ class _TechnicianRegistrationPageState
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
+      
+      debugPrint('🔧 Registering technician: ${technician.name}');
+      debugPrint('📍 Pincode: ${technician.primaryPincode}');
+      debugPrint('🔔 FCM Token: ${technician.fcmToken?.substring(0, 20)}...');
+      
       await authProvider.saveTechnician(technician);
 
-     if (mounted) {
-  Navigator.pushAndRemoveUntil(
-    context,
-    MaterialPageRoute(builder: (_) => const TechnicianHomePage()),
-    (_) => false,
-  );
-}
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const TechnicianHomePage()),
+          (_) => false,
+        );
+      }
 
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Registration failed: $e')),
-      );
+      debugPrint('❌ Registration failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Registration failed: $e')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {

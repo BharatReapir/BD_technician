@@ -87,10 +87,59 @@ class AuthProvider extends ChangeNotifier {
     debugPrint('✅ OTP process completed, verification ID: $_verificationId');
   }
 
-  // ✅ Verify OTP
+  // ✅ Verify OTP with technician-only test bypass
   Future<UserCredential> verifyOTP(String otp) async {
     debugPrint('🔐 Verifying OTP: $otp');
     debugPrint('🔑 Using verification ID: $_verificationId');
+    debugPrint('👤 User type: $_userType');
+    
+    // 🧪 TEST BYPASS: Allow 123456 for technicians (check SharedPreferences too)
+    final prefs = await SharedPreferences.getInstance();
+    final storedUserType = prefs.getString('userType') ?? 'user';
+    debugPrint('💾 Stored user type: $storedUserType');
+    
+    if (otp == '123456' && (storedUserType == 'technician' || _userType == 'technician')) {
+      debugPrint('🧪 Technician test OTP detected - bypassing Firebase verification');
+      
+      try {
+        // Create test account with email/password instead of anonymous
+        final testEmail = 'test_tech_${DateTime.now().millisecondsSinceEpoch}@bharatapp.com';
+        final testPassword = 'test123456';
+        
+        debugPrint('🧪 Creating test technician account: $testEmail');
+        
+        final userCredential = await _auth.createUserWithEmailAndPassword(
+          email: testEmail,
+          password: testPassword,
+        );
+        
+        debugPrint('✅ Technician test account created: ${userCredential.user?.uid}');
+        return userCredential;
+      } catch (e) {
+        debugPrint('❌ Test account creation failed: $e');
+        
+        // If creation fails, try to sign in with a default test account
+        try {
+          debugPrint('🧪 Trying default test account...');
+          final userCredential = await _auth.signInWithEmailAndPassword(
+            email: 'test.technician@bharatapp.com',
+            password: 'test123456',
+          );
+          debugPrint('✅ Default test account sign in successful: ${userCredential.user?.uid}');
+          return userCredential;
+        } catch (e2) {
+          debugPrint('❌ Default test account failed, creating it: $e2');
+          
+          // Create the default test account
+          final userCredential = await _auth.createUserWithEmailAndPassword(
+            email: 'test.technician@bharatapp.com',
+            password: 'test123456',
+          );
+          debugPrint('✅ Default test account created: ${userCredential.user?.uid}');
+          return userCredential;
+        }
+      }
+    }
     
     if (_verificationId == null || _verificationId!.isEmpty) {
       debugPrint('❌ No verification ID found');

@@ -1388,7 +1388,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
-                        await FCMService.clearPendingNotifications();
+                        await FCMService().clearPendingNotifications();
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Notifications cleared')),

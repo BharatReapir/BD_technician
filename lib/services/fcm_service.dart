@@ -11,7 +11,6 @@ class FCMService {
   
   static bool _isInitialized = false;
 
-  /// Initialize FCM Service
   static Future<void> initialize() async {
     if (_isInitialized) return;
     
@@ -170,7 +169,7 @@ class FCMService {
     required String body,
     String? payload,
   }) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+    final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
       'booking_alerts',
       'Booking Alerts',
@@ -182,7 +181,7 @@ class FCMService {
       color: Color(0xFF0047AB),
       playSound: true,
       enableVibration: true,
-      vibrationPattern: Int64List.fromList([0, 1000, 500, 1000]), // Custom vibration pattern
+      vibrationPattern: null, // Remove custom vibration pattern
       sound: RawResourceAndroidNotificationSound('notification'),
       ticker: 'New job available in your area!',
       autoCancel: false, // Keep notification until user interacts
@@ -202,7 +201,7 @@ class FCMService {
       presentSound: true,
     );
 
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+    final NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
       iOS: iOSPlatformChannelSpecifics,
     );
@@ -541,6 +540,9 @@ class FCMService {
       debugPrint('❌ Complete notification flow test failed: $e');
     }
   }
+
+  /// Clear pending notifications from storage
+  Future<void> clearPendingNotifications() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('pending_notifications');

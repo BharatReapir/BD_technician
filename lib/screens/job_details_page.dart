@@ -67,10 +67,10 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
   Future<void> _checkInternetConnection() async {
     try {
       // Listen to connectivity changes
-      Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
+      Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
         if (_isDisposed) return;
         
-        final connected = result != ConnectivityResult.none;
+        final connected = results.isNotEmpty && !results.contains(ConnectivityResult.none);
         _safeSetState(() {
           hasInternet = connected;
           // Overall connection status is true if EITHER internet OR Firebase is connected
@@ -81,10 +81,10 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
       });
       
       // Check initial state
-      final connectivityResult = await Connectivity().checkConnectivity();
+      final connectivityResults = await Connectivity().checkConnectivity();
       if (!_isDisposed) {
         _safeSetState(() {
-          hasInternet = connectivityResult != ConnectivityResult.none;
+          hasInternet = connectivityResults.isNotEmpty && !connectivityResults.contains(ConnectivityResult.none);
           isConnected = hasInternet || firebaseConnected;
         });
         debugPrint('🌐 Initial internet status: $hasInternet');
@@ -393,29 +393,8 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
     }
   }
 
-  String _getMonthName(int month) {
-    const months = [
-      '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    return months[month];
-  }
-
-  String _formatTimeSlot() {
-    final now = DateTime.now();
-    final startHour = (now.hour + 1) % 24;
-    final endHour = (startHour + 2) % 24;
-    
-    String formatHour(int hour) {
-      if (hour == 0) return '12:00 AM';
-      if (hour < 12) return '${hour}:00 AM';
-      if (hour == 12) return '12:00 PM';
-      return '${hour - 12}:00 PM';
-    }
-    
-    return '${formatHour(startHour)} - ${formatHour(endHour)}';
-  }
-    if (_isDisposed) return;
+  /// Handle loading errors with appropriate user feedback
+  Future<void> _handleLoadingError(dynamic error) async {
     
     debugPrint('❌ Handling loading error: $error');
     

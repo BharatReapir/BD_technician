@@ -4,7 +4,6 @@ import 'dart:convert';
 class AddressService {
   static const String _addressesKey = 'saved_addresses';
 
-  /// Get all saved addresses for the current user
   static Future<List<Map<String, String>>> getSavedAddresses() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -15,7 +14,7 @@ class AddressService {
         return addressesList.map((address) => Map<String, String>.from(address)).toList();
       }
       
-      // Return default addresses if none saved
+      
       return _getDefaultAddresses();
     } catch (e) {
       print('❌ Error getting saved addresses: $e');

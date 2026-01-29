@@ -456,4 +456,27 @@ class AuthProvider extends ChangeNotifier {
     // Reload user data
     await loadUser();
   }
+
+  /// 🔹 REFRESH TECHNICIAN DATA (for technician home page)
+  Future<void> refreshTechnicianData() async {
+    if (_technician == null) return;
+    
+    debugPrint('🔄 Refreshing technician data...');
+    
+    try {
+      final freshData = await FirebaseService.getTechnician(_technician!.uid);
+      if (freshData != null) {
+        _technician = freshData;
+        
+        // Update cache
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('technician', json.encode(_technician!.toJson()));
+        
+        notifyListeners();
+        debugPrint('✅ Technician data refreshed');
+      }
+    } catch (e) {
+      debugPrint('❌ Error refreshing technician data: $e');
+    }
+  }
 }

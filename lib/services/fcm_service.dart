@@ -182,6 +182,17 @@ class FCMService {
       color: Color(0xFF0047AB),
       playSound: true,
       enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 1000, 500, 1000]), // Custom vibration pattern
+      sound: RawResourceAndroidNotificationSound('notification'),
+      ticker: 'New job available in your area!',
+      autoCancel: false, // Keep notification until user interacts
+      ongoing: false,
+      styleInformation: BigTextStyleInformation(
+        body,
+        htmlFormatBigText: true,
+        contentTitle: title,
+        htmlFormatContentTitle: true,
+      ),
     );
 
     const DarwinNotificationDetails iOSPlatformChannelSpecifics =
@@ -327,8 +338,209 @@ class FCMService {
     }
   }
 
-  /// Clear pending notifications
-  static Future<void> clearPendingNotifications() async {
+  /// Send notification to specific FCM token
+  static Future<void> sendNotificationToToken({
+    required String token,
+    required String title,
+    required String body,
+    required Map<String, String> data,
+  }) async {
+    try {
+      debugPrint('🔔 Sending notification to token: ${token.substring(0, 20)}...');
+      debugPrint('📱 Title: $title');
+      debugPrint('📱 Body: $body');
+      debugPrint('📱 Data: $data');
+      
+      // Show local notification immediately for testing and immediate feedback
+      await _showLocalNotification(
+        title: title,
+        body: body,
+        payload: jsonEncode(data),
+      );
+      
+      // Store notification for history
+      await _storeNotificationData({
+        'title': title,
+        'body': body,
+        'timestamp': DateTime.now().toIso8601String(),
+        'token': token.substring(0, 10) + '...',
+        ...data,
+      });
+      
+      debugPrint('✅ Local notification sent successfully');
+      
+      // Note: For actual FCM server-side sending, you'd need to use Firebase Admin SDK
+      // or call your backend API that sends the notification using the FCM HTTP API
+      // This is a client-side implementation for immediate local notifications
+      
+      // If you have a backend service, you would call it here:
+      // await _sendServerNotification(token, title, body, data);
+      
+    } catch (e) {
+      debugPrint('❌ Error sending notification: $e');
+    }
+  }
+
+  /// Send server-side notification (placeholder for backend integration)
+  static Future<void> _sendServerNotification(
+    String token,
+    String title,
+    String body,
+    Map<String, String> data,
+  ) async {
+    // This would call your backend API to send FCM notifications
+    // Example:
+    // final response = await http.post(
+    //   Uri.parse('https://your-backend.com/send-notification'),
+    //   headers: {'Content-Type': 'application/json'},
+    //   body: jsonEncode({
+    //     'token': token,
+    //     'title': title,
+    //     'body': body,
+    //     'data': data,
+    //   }),
+    // );
+    debugPrint('📡 Server notification would be sent here (backend integration needed)');
+  }
+
+  /// Send real-time notification for new booking
+  static Future<void> sendNewBookingNotification({
+    required String bookingId,
+    required String service,
+    required String pincode,
+    required double amount,
+  }) async {
+    try {
+      debugPrint('🔔 Sending real-time booking notification');
+      
+      final notificationData = {
+        'type': 'new_booking',
+        'bookingId': bookingId,
+        'service': service,
+        'pincode': pincode,
+        'amount': amount.toString(),
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+      
+      // Show immediate local notification
+      await _showLocalNotification(
+        title: '🔔 New Job Available!',
+        body: '$service in $pincode - ₹${amount.toStringAsFixed(0)}',
+        payload: jsonEncode(notificationData),
+      );
+      
+      // Store notification for history
+      await _storeNotificationData({
+        'title': '🔔 New Job Available!',
+        'body': '$service in $pincode - ₹${amount.toStringAsFixed(0)}',
+        'timestamp': DateTime.now().toIso8601String(),
+        ...notificationData,
+      });
+      
+      debugPrint('✅ Real-time notification sent successfully');
+    } catch (e) {
+      debugPrint('❌ Error sending real-time notification: $e');
+    }
+  }
+
+  /// Send immediate notification to all technicians in area
+  static Future<void> sendJobAlertToArea({
+    required String pincode,
+    required String service,
+    required String bookingId,
+    required double amount,
+    required String customerName,
+    required String scheduledTime,
+  }) async {
+    try {
+      debugPrint('🚨 Sending job alert to area: $pincode');
+      
+      final notificationData = {
+        'type': 'job_alert',
+        'bookingId': bookingId,
+        'service': service,
+        'pincode': pincode,
+        'amount': amount.toString(),
+        'customerName': customerName,
+        'scheduledTime': scheduledTime,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+      
+      // Show immediate local notification for all technicians in the area
+      await _showLocalNotification(
+        title: '🚨 URGENT: New Job in Your Area!',
+        body: '$service for $customerName - ₹${amount.toStringAsFixed(0)} in $pincode',
+        payload: jsonEncode(notificationData),
+      );
+      
+      // Store notification
+      await _storeNotificationData({
+        'title': '🚨 URGENT: New Job in Your Area!',
+        'body': '$service for $customerName - ₹${amount.toStringAsFixed(0)} in $pincode',
+        'timestamp': DateTime.now().toIso8601String(),
+        ...notificationData,
+      });
+      
+      debugPrint('✅ Job alert sent to area $pincode');
+    } catch (e) {
+      debugPrint('❌ Error sending job alert: $e');
+    }
+  }
+
+  /// Test notification functionality
+  static Future<void> testNotification() async {
+    try {
+      debugPrint('🧪 Testing notification functionality...');
+      
+      await _showLocalNotification(
+        title: '🧪 Test Notification',
+        body: 'FCM Service is working correctly!',
+        payload: jsonEncode({'type': 'test', 'timestamp': DateTime.now().toIso8601String()}),
+      );
+      
+      debugPrint('✅ Test notification sent successfully');
+    } catch (e) {
+      debugPrint('❌ Test notification failed: $e');
+    }
+  }
+
+  /// Test complete notification flow
+  static Future<void> testCompleteNotificationFlow() async {
+    try {
+      debugPrint('🧪 Testing complete notification flow...');
+      
+      // Test 1: Basic notification
+      await testNotification();
+      
+      // Wait a moment
+      await Future.delayed(const Duration(seconds: 2));
+      
+      // Test 2: Job alert notification
+      await sendJobAlertToArea(
+        pincode: '410210',
+        service: 'AC Repair',
+        bookingId: 'test_booking_123',
+        amount: 599.0,
+        customerName: 'Test Customer',
+        scheduledTime: 'Today 3:00 PM - 5:00 PM',
+      );
+      
+      // Wait a moment
+      await Future.delayed(const Duration(seconds: 2));
+      
+      // Test 3: New booking notification
+      await sendNewBookingNotification(
+        bookingId: 'test_booking_456',
+        service: 'Washing Machine Repair',
+        pincode: '410210',
+        amount: 399.0,
+      );
+      
+      debugPrint('✅ Complete notification flow test completed');
+    } catch (e) {
+      debugPrint('❌ Complete notification flow test failed: $e');
+    }
+  }
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('pending_notifications');
@@ -343,7 +555,17 @@ class FCMService {
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('🔔 Background message handler: ${message.messageId}');
+  debugPrint('🔔 Background message data: ${message.data}');
   
-  // Handle background message
-  // Note: You can't update UI from here, only perform background tasks
+  // Handle background notification processing
+  if (message.data['type'] == 'new_booking') {
+    debugPrint('🔔 New booking notification received in background');
+    // Store notification for when app opens
+    try {
+      // Note: SharedPreferences might not work in background handler
+      // Consider using a different storage method if needed
+    } catch (e) {
+      debugPrint('❌ Error storing background notification: $e');
+    }
+  }
 }

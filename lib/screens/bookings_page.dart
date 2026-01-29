@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../constants/colors.dart';
 import '../models/booking_model.dart';
 import '../services/firebase_service.dart';
+import '../services/pdf_service.dart'; // 📄 NEW: PDF service
 import '../providers/auth_provider.dart' as auth_provider;
 import '../providers/coin_provider.dart';
 
@@ -701,6 +702,44 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
               ],
             ),
           ],
+          
+          // 📄 NEW: PDF download button for completed bookings
+          if (booking.status == 'completed') ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _downloadInvoicePDF(booking),
+                    icon: const Icon(Icons.download, size: 18),
+                    label: const Text('Download Invoice'),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.green),
+                      foregroundColor: Colors.green,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _shareInvoicePDF(booking),
+                    icon: const Icon(Icons.share, size: 18),
+                    label: const Text('Share Invoice'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -924,6 +963,97 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
         return 'PAYMENT FAILED';
       default:
         return paymentStatus.toUpperCase();
+    }
+  }
+
+  /// 📄 Download invoice PDF
+  Future<void> _downloadInvoicePDF(BookingModel booking) async {
+    try {
+      debugPrint('📄 Downloading invoice PDF for booking: ${booking.id}');
+      
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Generating invoice...'),
+            ],
+          ),
+        ),
+      );
+      
+      await PDFService.shareInvoicePDF(booking);
+      
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('📄 Invoice downloaded successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      debugPrint('❌ Error downloading PDF: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error downloading invoice: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// 📄 Share invoice PDF
+  Future<void> _shareInvoicePDF(BookingModel booking) async {
+    try {
+      debugPrint('📄 Sharing invoice PDF for booking: ${booking.id}');
+      
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Preparing invoice...'),
+            ],
+          ),
+        ),
+      );
+      
+      await PDFService.shareInvoicePDF(booking);
+      
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+    } catch (e) {
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      debugPrint('❌ Error sharing PDF: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error sharing invoice: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }

@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -41,12 +42,19 @@ class _FirebaseDebugPageState extends State<FirebaseDebugPage> {
 
       // Test 2: Check Database URL
       _addLog('Test 2: Checking Database URL...');
-      final dbUrl = FirebaseDatabase.instance.databaseURL;
+      final dbUrl = FirebaseDatabase.instanceFor(
+        app: Firebase.app(),
+        databaseURL: 'https://bharatapp-4e9c8-default-rtdb.asia-southeast1.firebasedatabase.app/',
+      ).databaseURL;
       _addLog('📍 Database URL: $dbUrl');
 
       // Test 3: Try to write test data
       _addLog('Test 3: Writing test data...');
-      final testRef = FirebaseDatabase.instance.ref('test/debug');
+      final database = FirebaseDatabase.instanceFor(
+        app: Firebase.app(),
+        databaseURL: 'https://bharatapp-4e9c8-default-rtdb.asia-southeast1.firebasedatabase.app/',
+      );
+      final testRef = database.ref('test/debug');
       await testRef.set({
         'message': 'Test from emulator',
         'timestamp': DateTime.now().toIso8601String(),
@@ -66,7 +74,11 @@ class _FirebaseDebugPageState extends State<FirebaseDebugPage> {
       // Test 5: Try to write user data
       _addLog('Test 5: Writing user test data...');
       if (currentUser != null) {
-        final userRef = FirebaseDatabase.instance.ref('users/${currentUser.uid}');
+        final database = FirebaseDatabase.instanceFor(
+          app: Firebase.app(),
+          databaseURL: 'https://bharatapp-4e9c8-default-rtdb.asia-southeast1.firebasedatabase.app/',
+        );
+        final userRef = database.ref('users/${currentUser.uid}');
         await userRef.set({
           'uid': currentUser.uid,
           'name': 'Test User',
@@ -129,17 +141,19 @@ class _FirebaseDebugPageState extends State<FirebaseDebugPage> {
       _addLog('📝 Saving user data...');
       _addLog('Data: $userData');
 
-      await FirebaseDatabase.instance
-          .ref('users/${currentUser.uid}')
-          .set(userData);
+      await FirebaseDatabase.instanceFor(
+        app: Firebase.app(),
+        databaseURL: 'https://bharatapp-4e9c8-default-rtdb.asia-southeast1.firebasedatabase.app/',
+      ).ref('users/${currentUser.uid}').set(userData);
 
       _addLog('✅ User saved successfully!');
 
       // Verify by reading back
       _addLog('🔍 Verifying save...');
-      final snapshot = await FirebaseDatabase.instance
-          .ref('users/${currentUser.uid}')
-          .get();
+      final snapshot = await FirebaseDatabase.instanceFor(
+        app: Firebase.app(),
+        databaseURL: 'https://bharatapp-4e9c8-default-rtdb.asia-southeast1.firebasedatabase.app/',
+      ).ref('users/${currentUser.uid}').get();
 
       if (snapshot.exists) {
         _addLog('✅ VERIFIED! User exists in database');

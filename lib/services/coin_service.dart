@@ -1,9 +1,63 @@
 // services/coin_service.dart
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
+import '../firebase_options.dart';
 import '../models/coin_model.dart';
 
 class CoinService {
-  static final FirebaseDatabase _db = FirebaseDatabase.instance;
+  // ✅ Use singleton pattern like FirebaseService
+  static FirebaseDatabase? _realtimeDbInstance;
+  static bool _isInitialized = false;
+  
+  static FirebaseDatabase get _db {
+    if (_realtimeDbInstance == null || !_isInitialized) {
+      try {
+        String? databaseURL;
+        
+        if (kIsWeb) {
+          databaseURL = DefaultFirebaseOptions.web.databaseURL;
+        } else {
+          switch (defaultTargetPlatform) {
+            case TargetPlatform.android:
+              databaseURL = DefaultFirebaseOptions.android.databaseURL;
+              break;
+            case TargetPlatform.iOS:
+              databaseURL = DefaultFirebaseOptions.ios.databaseURL;
+              break;
+            case TargetPlatform.macOS:
+              databaseURL = DefaultFirebaseOptions.macos.databaseURL;
+              break;
+            case TargetPlatform.windows:
+              databaseURL = DefaultFirebaseOptions.windows.databaseURL;
+              break;
+            default:
+              databaseURL = DefaultFirebaseOptions.android.databaseURL;
+          }
+        }
+        
+        print('🔥 CoinService: Using Firebase Database URL: $databaseURL');
+        
+        // ✅ Use instanceFor with the app and databaseURL
+        _realtimeDbInstance = FirebaseDatabase.instanceFor(
+          app: Firebase.app(),
+          databaseURL: databaseURL!,
+        );
+        
+        // Enable persistence for offline support (not available on web)
+        if (!kIsWeb) {
+          _realtimeDbInstance!.setPersistenceEnabled(true);
+        }
+        
+        _isInitialized = true;
+        print('✅ CoinService: Firebase Database initialized successfully');
+      } catch (e) {
+        print('❌ CoinService: Error initializing Firebase Database: $e');
+        rethrow;
+      }
+    }
+    return _realtimeDbInstance!;
+  }
 
   // ========== COIN BALANCE OPERATIONS ==========
 
@@ -145,6 +199,68 @@ class CoinService {
   }
 
   // ========== COIN CREDIT OPERATIONS ==========
+
+  /// Add welcome bonus coins for new users
+  static Future<bool> addWelcomeBonus({
+    required String userId,
+    required String userName,
+  }) async {
+    try {
+      print('🎉 Adding welcome bonus for new user: $userName ($userId)');
+      
+      // Check if welcome bonus already given
+      final existingSnapshot = await _db.ref('coins/$userId/transactions')
+          .orderByChild('description')
+          .equalTo('Welcome bonus - New user signup')
+          .get();
+      
+      if (existingSnapshot.exists) {
+        print('⚠️ Welcome bonus already given to user: $userId');
+        return false;
+      }
+      
+      const int welcomeCoins = 500;
+      
+      // Set expiry date (180 days from now)
+      final expiryDate = DateTime.now().add(const Duration(days: 180));
+      
+      // Create welcome bonus transaction
+      final transactionRef = _db.ref('coins/$userId/transactions').push();
+      final transaction = CoinTransaction(
+        id: transactionRef.key!,
+        type: 'bonus',
+        coins: welcomeCoins,
+        value: welcomeCoins / 100.0,
+        description: 'Welcome bonus - New user signup',
+        timestamp: DateTime.now(),
+        bookingId: null,
+        isCredit: true,
+        expiryDate: expiryDate,
+        isExpired: false,
+      );
+      
+      await transactionRef.set(transaction.toJson());
+      
+      // Update balance
+      final balanceSnapshot = await _db.ref('coins/$userId/balance').get();
+      final currentCoins = balanceSnapshot.exists 
+          ? (balanceSnapshot.value as Map)['totalCoins'] ?? 0 
+          : 0;
+      final newBalance = currentCoins + welcomeCoins;
+      
+      await _db.ref('coins/$userId/balance').set({
+        'totalCoins': newBalance,
+        'discountValue': newBalance / 100.0,
+        'lastUpdated': DateTime.now().toIso8601String(),
+      });
+      
+      print('✅ Welcome bonus added: $welcomeCoins coins. New balance: $newBalance');
+      return true;
+    } catch (e) {
+      print('❌ Error adding welcome bonus: $e');
+      return false;
+    }
+  }
 
   /// Credit coins after booking completion
   static Future<bool> creditCoins({

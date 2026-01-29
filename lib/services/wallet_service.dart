@@ -1,14 +1,68 @@
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import '../models/wallet_transaction_model.dart';
+import '../firebase_options.dart';
 
 class WalletService {
-  final DatabaseReference _database = FirebaseDatabase.instance.ref();
+  // ✅ Use singleton pattern like FirebaseService
+  static FirebaseDatabase? _realtimeDbInstance;
+  static bool _isInitialized = false;
+  
+  static FirebaseDatabase get _realtimeDb {
+    if (_realtimeDbInstance == null || !_isInitialized) {
+      try {
+        String? databaseURL;
+        
+        if (kIsWeb) {
+          databaseURL = DefaultFirebaseOptions.web.databaseURL;
+        } else {
+          switch (defaultTargetPlatform) {
+            case TargetPlatform.android:
+              databaseURL = DefaultFirebaseOptions.android.databaseURL;
+              break;
+            case TargetPlatform.iOS:
+              databaseURL = DefaultFirebaseOptions.ios.databaseURL;
+              break;
+            case TargetPlatform.macOS:
+              databaseURL = DefaultFirebaseOptions.macos.databaseURL;
+              break;
+            case TargetPlatform.windows:
+              databaseURL = DefaultFirebaseOptions.windows.databaseURL;
+              break;
+            default:
+              databaseURL = DefaultFirebaseOptions.android.databaseURL;
+          }
+        }
+        
+        print('🔥 WalletService: Using Firebase Database URL: $databaseURL');
+        
+        // ✅ Use instanceFor with the app and databaseURL
+        _realtimeDbInstance = FirebaseDatabase.instanceFor(
+          app: Firebase.app(),
+          databaseURL: databaseURL!,
+        );
+        
+        // Enable persistence for offline support (not available on web)
+        if (!kIsWeb) {
+          _realtimeDbInstance!.setPersistenceEnabled(true);
+        }
+        
+        _isInitialized = true;
+        print('✅ WalletService: Firebase Database initialized successfully');
+      } catch (e) {
+        print('❌ WalletService: Error initializing Firebase Database: $e');
+        rethrow;
+      }
+    }
+    return _realtimeDbInstance!;
+  }
 
   /// Get wallet balance
   Future<double> getWalletBalance(String technicianId) async {
     try {
-      final snapshot = await _database
-          .child('technicians')
+      final snapshot = await _realtimeDb
+          .ref('technicians')
           .child(technicianId)
           .child('walletBalance')
           .get();
@@ -25,8 +79,8 @@ class WalletService {
 
   /// Get transaction history
   Stream<List<WalletTransaction>> getTransactionHistory(String technicianId) {
-    return _database
-        .child('wallet_transactions')
+    return _realtimeDb
+        .ref('wallet_transactions')
         .orderByChild('technicianId')
         .equalTo(technicianId)
         .onValue
@@ -64,8 +118,8 @@ class WalletService {
     String? jobId,
   }) async {
     try {
-      final balanceSnapshot = await _database
-          .child('technicians')
+      final balanceSnapshot = await _realtimeDb
+          .ref('technicians')
           .child(technicianId)
           .child('walletBalance')
           .get();
@@ -81,8 +135,8 @@ class WalletService {
       final newBalance = currentBalance - amount;
 
       // Update balance
-      await _database
-          .child('technicians')
+      await _realtimeDb
+          .ref('technicians')
           .child(technicianId)
           .update({
         'walletBalance': newBalance,
@@ -90,7 +144,7 @@ class WalletService {
       });
 
       // Add transaction
-      await _database.child('wallet_transactions').push().set({
+      await _realtimeDb.ref('wallet_transactions').push().set({
         'technicianId': technicianId,
         'amount': amount,
         'type': 'debit',
@@ -116,8 +170,8 @@ class WalletService {
     String? orderId,
   }) async {
     try {
-      final balanceSnapshot = await _database
-          .child('technicians')
+      final balanceSnapshot = await _realtimeDb
+          .ref('technicians')
           .child(technicianId)
           .child('walletBalance')
           .get();
@@ -129,8 +183,8 @@ class WalletService {
       final newBalance = currentBalance + amount;
 
       // Update balance
-      await _database
-          .child('technicians')
+      await _realtimeDb
+          .ref('technicians')
           .child(technicianId)
           .update({
         'walletBalance': newBalance,
@@ -138,7 +192,7 @@ class WalletService {
       });
 
       // Add transaction
-      await _database.child('wallet_transactions').push().set({
+      await _realtimeDb.ref('wallet_transactions').push().set({
         'technicianId': technicianId,
         'amount': amount,
         'type': 'credit',

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
 import '../models/technician_model.dart';
 import '../services/firebase_service.dart';
+import '../services/coin_service.dart'; // 🎉 NEW: Import coin service
 import 'dart:convert';
 import 'dart:async'; // 🔧 NEW: For Completer
 
@@ -323,6 +324,23 @@ class AuthProvider extends ChangeNotifier {
 
     // 1️⃣ Save to Firebase using FirebaseService
     await FirebaseService.saveUser(user);
+
+    // 🎉 NEW: Add 500 coins welcome bonus for new users
+    try {
+      final bonusAdded = await CoinService.addWelcomeBonus(
+        userId: user.uid,
+        userName: user.name,
+      );
+      
+      if (bonusAdded) {
+        debugPrint('🎉 Welcome bonus added: 500 coins for ${user.name}');
+      } else {
+        debugPrint('⚠️ Welcome bonus already exists or failed for ${user.name}');
+      }
+    } catch (e) {
+      debugPrint('❌ Error adding welcome bonus: $e');
+      // Don't fail user creation if bonus fails
+    }
 
     // 2️⃣ Save locally
     final prefs = await SharedPreferences.getInstance();

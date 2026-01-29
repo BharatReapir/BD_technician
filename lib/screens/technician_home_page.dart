@@ -122,19 +122,78 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                       ),
                     ],
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: currentTechnician.isOnline ? Colors.green : Colors.grey,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      currentTechnician.isOnline ? 'ONLINE' : 'OFFLINE',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                  Row(
+                    children: [
+                      // 🔔 NEW: Notification Bell Button
+                      Container(
+                        margin: const EdgeInsets.only(right: 12),
+                        child: Stack(
+                          children: [
+                            IconButton(
+                              onPressed: () => _showNotifications(context),
+                              icon: const Icon(
+                                Icons.notifications,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.white.withOpacity(0.2),
+                                padding: const EdgeInsets.all(8),
+                              ),
+                            ),
+                            // Notification badge (optional - can be enhanced later)
+                            Positioned(
+                              right: 8,
+                              top: 8,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                      // ONLINE/OFFLINE Toggle Button
+                      GestureDetector(
+                        onTap: () => _forceOnlineStatus(currentTechnician),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: currentTechnician.isOnline ? Colors.green : Colors.red,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                currentTechnician.isOnline ? Icons.wifi : Icons.wifi_off,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                currentTechnician.isOnline ? 'ONLINE' : 'OFFLINE',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.touch_app,
+                                color: Colors.white70,
+                                size: 12,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -293,24 +352,37 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       ElevatedButton(
+                                        onPressed: () => _forceOnlineStatus(currentTechnician),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.green,
+                                        ),
+                                        child: const Text('FORCE ONLINE'),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ElevatedButton(
                                         onPressed: () => _debugBookings(currentTechnician),
                                         child: const Text('Debug Jobs'),
                                       ),
-                                      const SizedBox(width: 12),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      ElevatedButton(
+                                        onPressed: () => _testNotifications(),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.blue,
+                                        ),
+                                        child: const Text('Test Notif'),
+                                      ),
+                                      const SizedBox(width: 8),
                                       ElevatedButton(
                                         onPressed: () => _fixBookingPincodes(),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.orange,
                                         ),
                                         child: const Text('Fix Pincodes'),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      ElevatedButton(
-                                        onPressed: () => _fixServiceNames(),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.purple,
-                                        ),
-                                        child: const Text('Fix Services'),
                                       ),
                                     ],
                                   ),
@@ -816,7 +888,13 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
-                        onPressed: () => _acceptBooking(booking.id!, technician.uid, technician.name),
+                        onPressed: () => {
+                          debugPrint('🎯 ACCEPT BUTTON PRESSED'),
+                          debugPrint('🎯 Booking ID from card: ${booking.id}'),
+                          debugPrint('🎯 Booking service: ${booking.service}'),
+                          debugPrint('🎯 Booking customer: ${booking.userName}'),
+                          _acceptBooking(booking.id!, technician.uid, technician.name)
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           foregroundColor: Colors.white,
@@ -845,21 +923,71 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Accepting job...'),
+            ],
+          ),
+        ),
       );
       
-      // Accept the booking
+      // Accept the booking (includes wallet deduction)
       await FirebaseService.acceptBooking(bookingId, technicianId);
       
       // Close loading
       if (mounted) Navigator.of(context).pop();
       
-      // Show success message
+      // Show success message with wallet deduction info
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Booking accepted successfully!'),
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '✅ Job accepted! ₹199 deducted from wallet. Navigating to job details...',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
             backgroundColor: Colors.green,
+            duration: const Duration(seconds: 3),
+            action: SnackBarAction(
+              label: 'View Wallet',
+              textColor: Colors.white,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TechWalletPage(
+                      technicianId: technicianId,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      }
+      
+      // Wait a moment for Firebase to sync, then navigate
+      await Future.delayed(const Duration(milliseconds: 1500));
+      
+      // Navigate to job details page immediately
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => JobDetailsPage(
+              bookingId: bookingId,
+              technicianId: technicianId,
+            ),
           ),
         );
       }
@@ -869,17 +997,53 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       // Close loading
       if (mounted) Navigator.of(context).pop();
       
-      // Show error
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Failed to accept booking: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      
       debugPrint('❌ Error accepting booking: $e');
+      
+      // Handle specific error cases
+      if (e.toString().contains('Insufficient wallet balance')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ Insufficient wallet balance! Need ₹199 to accept job'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      } else if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+        // Still navigate to job details even if update failed
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠️ Job accepted (sync pending)'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          
+          // Wait a moment then navigate
+          await Future.delayed(const Duration(milliseconds: 1000));
+          
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => JobDetailsPage(
+                bookingId: bookingId,
+                technicianId: technicianId,
+              ),
+            ),
+          );
+        }
+      } else {
+        // Show error for other types of errors
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Failed to accept booking: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -928,15 +1092,16 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
         final currentService = bookingData['service']?.toString() ?? '';
         
         if (serviceFixes.containsKey(currentService)) {
-          final newService = serviceFixes[currentService]!;
-          
-          await database.ref('bookings/$bookingId').update({
-            'service': newService,
-            'updatedAt': DateTime.now().toIso8601String(),
-          });
-          
-          debugPrint('✅ Fixed booking $bookingId: $currentService → $newService');
-          fixedCount++;
+          final newService = serviceFixes[currentService];
+          if (newService != null) {
+            await database.ref('bookings/$bookingId').update({
+              'service': newService,
+              'updatedAt': DateTime.now().toIso8601String(),
+            });
+            
+            debugPrint('✅ Fixed booking $bookingId: $currentService → $newService');
+            fixedCount++;
+          }
         }
       }
       
@@ -1103,6 +1268,193 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     }
   }
 
+  /// Show notifications panel
+  void _showNotifications(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.notifications, color: Colors.white, size: 24),
+                  const SizedBox(width: 12),
+                  const Text(
+                    'Notifications',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: FutureBuilder<List<Map<String, dynamic>>>(
+                future: FCMService.getPendingNotifications(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  final notifications = snapshot.data ?? [];
+                  
+                  if (notifications.isEmpty) {
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.notifications_off, size: 64, color: Colors.grey),
+                          SizedBox(height: 16),
+                          Text(
+                            'No notifications yet',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'You\'ll receive notifications for new jobs',
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  
+                  return ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: notifications.length,
+                    itemBuilder: (context, index) {
+                      final notification = notifications[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          leading: const CircleAvatar(
+                            backgroundColor: AppColors.primary,
+                            child: Icon(Icons.work, color: Colors.white),
+                          ),
+                          title: Text(notification['title'] ?? 'New Job'),
+                          subtitle: Text(notification['body'] ?? 'Job notification'),
+                          trailing: Text(
+                            _formatNotificationTime(notification['timestamp']),
+                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => _testNotifications(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Test Notification'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await FCMService.clearPendingNotifications();
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Notifications cleared')),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Clear All'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatNotificationTime(dynamic timestamp) {
+    if (timestamp == null) return 'Now';
+    
+    try {
+      final DateTime time = DateTime.parse(timestamp.toString());
+      final Duration diff = DateTime.now().difference(time);
+      
+      if (diff.inMinutes < 1) return 'Now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      return '${diff.inDays}d ago';
+    } catch (e) {
+      return 'Now';
+    }
+  }
+
+  Future<void> _testNotifications() async {
+    try {
+      debugPrint('🧪 Testing notifications...');
+      
+      // Test FCM service
+      await FCMService.testNotification();
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🧪 Test notification sent! Check your notification panel.'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Test notification error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Test failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _rejectBooking(String bookingId, String technicianId) async {
     try {
       debugPrint('🔴 Technician rejecting booking: $bookingId');
@@ -1149,6 +1501,67 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       }
       
       debugPrint('❌ Error rejecting booking: $e');
+    }
+  }
+
+  /// Force technician online status
+  Future<void> _forceOnlineStatus(TechnicianModel technician) async {
+    try {
+      debugPrint('🔥 FORCING TECHNICIAN ONLINE');
+      debugPrint('🔥 Current status: ${technician.isOnline}');
+      
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Going ONLINE...'),
+            ],
+          ),
+        ),
+      );
+      
+      // Force update to ONLINE in Firebase
+      await FirebaseService.updateTechnicianStatus(technician.uid, true);
+      
+      // Also update the auth provider
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.refreshTechnicianData();
+      
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🔥 FORCED ONLINE! You should now receive jobs!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      
+      debugPrint('✅ Technician forced ONLINE successfully');
+    } catch (e) {
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Failed to go online: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      
+      debugPrint('❌ Error forcing online: $e');
     }
   }
 

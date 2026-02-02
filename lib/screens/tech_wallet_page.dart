@@ -5,6 +5,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../services/wallet_service.dart';
 import '../services/tech_payment_service.dart';
 import '../models/wallet_transaction_model.dart';
+import '../models/billing_model.dart';
 import 'package:intl/intl.dart';
 
 class TechWalletPage extends StatefulWidget {
@@ -151,10 +152,19 @@ class _TechWalletPageState extends State<TechWalletPage> {
       debugPrint('📤 Creating order for ₹$amount');
       debugPrint('📤 Technician ID: ${widget.technicianId}');
       
+      // Calculate GST-compliant wallet recharge
+      final rechargeCalculation = PricingCalculator.calculateWalletRecharge(amount);
+      final totalAmount = rechargeCalculation['totalAmount']!;
+      final gstAmount = rechargeCalculation['gstAmount']!;
+      
+      debugPrint('💰 Recharge Amount: ₹$amount');
+      debugPrint('💰 GST Amount: ₹$gstAmount');
+      debugPrint('💰 Total Amount: ₹$totalAmount');
+      
       // Create order on backend
       final orderData = await TechPaymentService.createWalletRechargeOrder(
         technicianId: widget.technicianId,
-        amount: amount,
+        amount: totalAmount, // Send total amount including GST
       );
 
       debugPrint('📥 Order data received: $orderData');
@@ -166,16 +176,21 @@ class _TechWalletPageState extends State<TechWalletPage> {
 
       var options = {
         'key': RAZORPAY_KEY,
-        'amount': (amount * 100).toInt(), // Amount in paise
+        'amount': (totalAmount * 100).toInt(), // Amount in paise (including GST)
         'order_id': orderData['orderId'],
         'name': 'Wallet Recharge',
-        'description': 'Recharge your technician wallet',
+        'description': 'Recharge your technician wallet (₹$amount + GST ₹${gstAmount.toStringAsFixed(2)})',
         'prefill': {
           'contact': '',
           'email': '',
         },
         'theme': {
           'color': '#EB4D4B',
+        },
+        'notes': {
+          'recharge_amount': amount.toString(),
+          'gst_amount': gstAmount.toString(),
+          'total_amount': totalAmount.toString(),
         },
       };
 
@@ -229,14 +244,58 @@ class _TechWalletPageState extends State<TechWalletPage> {
               keyboardType: TextInputType.number,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: InputDecoration(
-                labelText: 'Amount',
+                labelText: 'Recharge Amount',
                 prefixText: '₹',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
                 hintText: 'Enter amount',
+                helperText: 'GST @18% will be added',
               ),
+              onChanged: (value) {
+                setState(() {}); // Trigger rebuild to update GST calculation
+              },
             ),
+            const SizedBox(height: 16),
+            
+            // GST Breakdown Display
+            if (_amountController.text.isNotEmpty && double.tryParse(_amountController.text) != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.bgLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Recharge Amount:'),
+                        Text('₹${_amountController.text}'),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('GST @18%:'),
+                        Text('₹${(double.parse(_amountController.text) * 0.18).toStringAsFixed(2)}'),
+                      ],
+                    ),
+                    const Divider(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Total Payable:', style: TextStyle(fontWeight: FontWeight.bold)),
+                        Text('₹${(double.parse(_amountController.text) * 1.18).toStringAsFixed(2)}', 
+                             style: const TextStyle(fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -248,7 +307,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Minimum: ₹100',
+              'Minimum: ₹100 • GST @18% applicable',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey.shade600,
@@ -388,7 +447,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  '₹200 deducted per booking acceptance',
+                                  '₹${PricingCalculator.FIXED_COMMISSION.toStringAsFixed(0)} deducted per booking acceptance',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: AppColors.secondary,
@@ -442,7 +501,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  'Recharge your wallet and ₹200 will be deducted each time you accept a booking.',
+                                  'Recharge your wallet and ₹${PricingCalculator.FIXED_COMMISSION.toStringAsFixed(0)} will be deducted each time you accept a booking.',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: AppColors.primary,

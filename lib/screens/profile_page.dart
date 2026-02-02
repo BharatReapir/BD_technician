@@ -1,16 +1,81 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../constants/colors.dart';
-import '../providers/auth_provider.dart';
+import '../providers/auth_provider.dart' as AppAuthProvider;
+import '../services/firebase_service.dart';
+import '../services/coin_service.dart';
 import '../screens/landing_page.dart';
 import 'saved_addresses_page.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
 
   @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  int _totalBookings = 0;
+  int _totalCoins = 0;
+  int _totalRewards = 0;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserStats();
+  }
+
+  Future<void> _loadUserStats() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // Load bookings count
+        final bookings = await FirebaseService.getUserBookings(user.uid);
+        
+        // Load coin balance
+        int coinBalance = 0;
+        try {
+          final balance = await CoinService.getCoinBalance(user.uid);
+          coinBalance = balance.totalCoins;
+        } catch (e) {
+          debugPrint('Error loading coin balance: $e');
+          coinBalance = 0;
+        }
+        
+        // Calculate rewards (coins earned from completed bookings)
+        final completedBookings = bookings.where((b) => b.status == 'completed').length;
+        final rewardsEarned = completedBookings * 10; // 10 coins per completed booking
+        
+        if (mounted) {
+          setState(() {
+            _totalBookings = bookings.length;
+            _totalCoins = coinBalance;
+            _totalRewards = rewardsEarned;
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading user stats: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
+    final authProvider = Provider.of<AppAuthProvider.AuthProvider>(context);
     final user = authProvider.user;
 
     return Scaffold(
@@ -91,21 +156,35 @@ class ProfilePage extends StatelessWidget {
             // Stats Cards
             Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard('12', 'Bookings', Icons.calendar_today),
+              child: _isLoading 
+                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                : Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          _totalBookings.toString(), 
+                          'Bookings', 
+                          Icons.calendar_today
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          _totalCoins.toString(), 
+                          'Coins', 
+                          Icons.monetization_on
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          _totalRewards.toString(), 
+                          'Rewards', 
+                          Icons.card_giftcard
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard('₹1,250', 'Wallet', Icons.account_balance_wallet),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard('5', 'Rewards', Icons.card_giftcard),
-                  ),
-                ],
-              ),
             ),
 
             // Menu Items

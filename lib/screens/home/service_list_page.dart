@@ -236,6 +236,7 @@ class ServiceListPage extends StatelessWidget {
                         reviews: 1523,
                         basePrice: basePrice,
                         priceType: priceType,
+                        acType: subCategory, // Pass the AC type
                       ),
                     ),
                   );

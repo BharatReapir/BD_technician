@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import '../models/billing_model.dart';
 
 class PaymentService {
   // 🔒 REPLACE THIS with your actual backend URL
@@ -14,11 +15,23 @@ class PaymentService {
     required double serviceCharge,
     required String area, // "standard" or "premium"
     required String userId,
+    String? pincode,
+    double coinDiscount = 0.0,
   }) async {
     try {
       debugPrint('📤 Creating Razorpay order...');
       debugPrint('Service Charge: ₹$serviceCharge');
       debugPrint('Area: $area');
+      debugPrint('Coin Discount: ₹$coinDiscount');
+
+      // Use PricingCalculator for GST-compliant calculations
+      final visitingCharge = area == 'standard' 
+          ? PricingCalculator.VISITING_CHARGE_STANDARD 
+          : PricingCalculator.VISITING_CHARGE_PREMIUM;
+      
+      final taxableAmount = serviceCharge + visitingCharge;
+      final gstAmount = taxableAmount * PricingCalculator.GST_RATE;
+      final totalAmount = taxableAmount + gstAmount;
 
       final response = await http.post(
         Uri.parse('$_baseUrl/createRazorpayOrder'),
@@ -26,8 +39,13 @@ class PaymentService {
         body: json.encode({
           'bookingId': bookingId,
           'serviceCharge': serviceCharge,
-          'area': area, // "standard" = 299, "premium" = 399
+          'visitingCharge': visitingCharge,
+          'taxableAmount': taxableAmount,
+          'gstAmount': gstAmount,
+          'totalAmount': totalAmount,
+          'area': area,
           'userId': userId,
+          'coinDiscount': coinDiscount,
         }),
       );
 

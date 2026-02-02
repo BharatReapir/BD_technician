@@ -182,7 +182,7 @@ class FCMService {
       playSound: true,
       enableVibration: true,
       vibrationPattern: null, // Remove custom vibration pattern
-      sound: RawResourceAndroidNotificationSound('notification'),
+      // sound: RawResourceAndroidNotificationSound('notification'), // ✅ REMOVE: Causing error
       ticker: 'New job available in your area!',
       autoCancel: false, // Keep notification until user interacts
       ongoing: false,
@@ -345,10 +345,10 @@ class FCMService {
     required Map<String, String> data,
   }) async {
     try {
-      debugPrint('🔔 Sending notification to token: ${token.substring(0, 20)}...');
-      debugPrint('📱 Title: $title');
-      debugPrint('📱 Body: $body');
-      debugPrint('📱 Data: $data');
+      debugPrint('🔔 FCM DEBUG: Sending notification to token: ${token.substring(0, 20)}...');
+      debugPrint('📱 FCM DEBUG: Title: $title');
+      debugPrint('📱 FCM DEBUG: Body: $body');
+      debugPrint('📱 FCM DEBUG: Data: $data');
       
       // Show local notification immediately for testing and immediate feedback
       await _showLocalNotification(
@@ -356,6 +356,7 @@ class FCMService {
         body: body,
         payload: jsonEncode(data),
       );
+      debugPrint('✅ FCM DEBUG: Local notification shown');
       
       // Store notification for history
       await _storeNotificationData({
@@ -365,8 +366,9 @@ class FCMService {
         'token': token.substring(0, 10) + '...',
         ...data,
       });
+      debugPrint('✅ FCM DEBUG: Notification stored in history');
       
-      debugPrint('✅ Local notification sent successfully');
+      debugPrint('✅ FCM DEBUG: Notification process completed successfully');
       
       // Note: For actual FCM server-side sending, you'd need to use Firebase Admin SDK
       // or call your backend API that sends the notification using the FCM HTTP API
@@ -376,7 +378,7 @@ class FCMService {
       // await _sendServerNotification(token, title, body, data);
       
     } catch (e) {
-      debugPrint('❌ Error sending notification: $e');
+      debugPrint('❌ FCM DEBUG: Error sending notification: $e');
     }
   }
 

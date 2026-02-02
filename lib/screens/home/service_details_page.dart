@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
+import '../../data/service_details_data.dart';
 import 'book_slot_page.dart';
 
-class ServiceDetailsPage extends StatelessWidget {
+class ServiceDetailsPage extends StatefulWidget {
   final String serviceName;
   final String price;
   final double rating;
   final int reviews;
   final int basePrice;
   final String? priceType;
+  final String? acType;
 
   const ServiceDetailsPage({
     Key? key,
@@ -18,10 +20,21 @@ class ServiceDetailsPage extends StatelessWidget {
     required this.reviews,
     required this.basePrice,
     this.priceType,
+    this.acType,
   }) : super(key: key);
 
   @override
+  State<ServiceDetailsPage> createState() => _ServiceDetailsPageState();
+}
+
+class _ServiceDetailsPageState extends State<ServiceDetailsPage> {
+  @override
   Widget build(BuildContext context) {
+    // Get detailed service information
+    final serviceDetails = widget.acType != null 
+        ? ServiceDetailsData.getServiceDetail(widget.acType!, widget.serviceName)
+        : null;
+    
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -43,37 +56,26 @@ class ServiceDetailsPage extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Service Image Header
+                  // Service Header
                   Container(
-                    height: 200,
                     width: double.infinity,
+                    padding: const EdgeInsets.all(16.0),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                         colors: [
-                          AppColors.primary.withOpacity(0.3),
-                          AppColors.tertiary.withOpacity(0.3),
+                          AppColors.primary.withOpacity(0.1),
+                          AppColors.primary.withOpacity(0.05),
                         ],
                       ),
                     ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.build_circle_outlined,
-                        size: 80,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                  
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Service Name and Rating
                         Text(
-                          serviceName,
+                          serviceDetails?['title'] ?? widget.serviceName,
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -86,7 +88,7 @@ class ServiceDetailsPage extends StatelessWidget {
                             const Icon(Icons.star, color: Colors.amber, size: 18),
                             const SizedBox(width: 4),
                             Text(
-                              rating.toStringAsFixed(1),
+                              widget.rating.toStringAsFixed(1),
                               style: const TextStyle(
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
@@ -95,7 +97,7 @@ class ServiceDetailsPage extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '• $reviews reviews',
+                              '• ${widget.reviews} reviews',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textGray,
@@ -104,15 +106,16 @@ class ServiceDetailsPage extends StatelessWidget {
                             const SizedBox(width: 12),
                             const Icon(Icons.access_time, size: 16, color: AppColors.textGray),
                             const SizedBox(width: 4),
-                            const Text(
-                              '45-60 mins',
-                              style: TextStyle(
+                            Text(
+                              serviceDetails?['duration'] ?? '30-45 mins',
+                              style: const TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textGray,
                               ),
                             ),
                           ],
                         ),
+                        
                         const SizedBox(height: 24),
                         
                         // Price Breakdown
@@ -121,6 +124,9 @@ class ServiceDetailsPage extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: AppColors.bgLight,
                             borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.2),
+                            ),
                           ),
                           child: Column(
                             children: [
@@ -131,12 +137,11 @@ class ServiceDetailsPage extends StatelessWidget {
                                     'Base Service Price',
                                     style: TextStyle(
                                       fontSize: 16,
-                                      color: AppColors.textDark,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
                                   Text(
-                                    price,
+                                    widget.price,
                                     style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold,
@@ -145,7 +150,7 @@ class ServiceDetailsPage extends StatelessWidget {
                                   ),
                                 ],
                               ),
-                              if (priceType != 'inspection') ...[
+                              if (widget.priceType != 'inspection') ...[
                                 const Divider(height: 24),
                                 _buildPriceInfoRow('Visiting Charge', 'Applicable'),
                                 const SizedBox(height: 8),
@@ -157,7 +162,7 @@ class ServiceDetailsPage extends StatelessWidget {
                                     SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        'Final bill may vary based on technician inspection',
+                                        'Final amount will be calculated at checkout including visiting charge and GST',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: AppColors.textGray,
@@ -170,83 +175,62 @@ class ServiceDetailsPage extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 24),
-                        
-                        // What's Included
-                        const Text(
-                          "What's Included",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textDark,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildIncludedItem('Professional technician visit'),
-                        _buildIncludedItem('General checkup and diagnostics'),
-                        _buildIncludedItem('Performance inspection'),
-                        _buildIncludedItem('Basic troubleshooting'),
-                        _buildIncludedItem('Service completion report'),
-                        const SizedBox(height: 24),
-                        
-                        // What's Not Included
-                        const Text(
-                          "What's Not Included",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textDark,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildNotIncludedItem('Spare parts replacement (charged separately)'),
-                        _buildNotIncludedItem('Additional materials (copper pipe, stand, etc.)'),
-                        _buildNotIncludedItem('Gas refilling (if applicable)'),
-                        _buildNotIncludedItem('Deep cleaning or overhaul'),
-                        const SizedBox(height: 24),
-                        
-                        // Additional Info
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.blue.withOpacity(0.3),
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                '📋 Service Policy',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textDark,
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                '• Visiting charge is mandatory and non-refundable\n• Final bill amount will be determined after technician inspection\n• Additional charges may apply for parts and materials\n• Payment to be made after service completion',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textDark,
-                                  height: 1.5,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                   ),
+                  
+                  // Service Details Content
+                  if (serviceDetails != null) ...[
+                    _buildServiceSection('What\'s Included', serviceDetails['included']),
+                    _buildServiceSection('What\'s Not Included', serviceDetails['notIncluded']),
+                    _buildServiceSection('Service Process', serviceDetails['process']),
+                    if (serviceDetails['bestFor'] != null)
+                      _buildBestForSection('Best For', serviceDetails['bestFor']),
+                    if (serviceDetails['additionalCharges'] != null)
+                      _buildServiceSection('Additional Charges (If Applicable)', serviceDetails['additionalCharges']),
+                    if (serviceDetails['importantNotes'] != null)
+                      _buildImportantNotesSection('Important Notes', serviceDetails['importantNotes']),
+                  ] else ...[
+                    // Default content when no specific details available
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Service Information',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgLight,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Professional ${widget.serviceName} service with experienced technicians. Quality service guaranteed.',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textDark,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
           
-          // Bottom Button
+          // Book Now Button
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -267,9 +251,9 @@ class ServiceDetailsPage extends StatelessWidget {
                     context,
                     MaterialPageRoute(
                       builder: (context) => BookSlotPage(
-                        serviceName: serviceName,
-                        price: price,
-                        basePrice: basePrice.toDouble(),
+                        serviceName: widget.serviceName,
+                        price: widget.price,
+                        basePrice: widget.basePrice.toDouble(),
                       ),
                     ),
                   );
@@ -282,13 +266,179 @@ class ServiceDetailsPage extends StatelessWidget {
                   ),
                 ),
                 child: const Text(
-                  'Proceed to Book',
+                  'Book Now',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                 ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceSection(String title, List<String>? items) {
+    if (items == null || items.isEmpty) return const SizedBox.shrink();
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textDark,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.bgLight,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.primary.withOpacity(0.2),
+              ),
+            ),
+            child: Column(
+              children: items.map((item) => _buildServiceItem(item, title.contains('Not Included'))).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBestForSection(String title, String? text) {
+    if (text == null || text.isEmpty) return const SizedBox.shrink();
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textDark,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.primary.withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.star, color: AppColors.primary, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImportantNotesSection(String title, List<String>? items) {
+    if (items == null || items.isEmpty) return const SizedBox.shrink();
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textDark,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.orange.withOpacity(0.3),
+              ),
+            ),
+            child: Column(
+              children: items.map((item) => _buildImportantNoteItem(item)).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServiceItem(String text, [bool isNotIncluded = false]) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isNotIncluded ? Icons.cancel : Icons.check_circle, 
+            color: isNotIncluded ? Colors.red : AppColors.primary, 
+            size: 20
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 15,
+                color: AppColors.textDark,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImportantNoteItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 15,
+                color: AppColors.textDark,
               ),
             ),
           ),
@@ -305,62 +455,18 @@ class ServiceDetailsPage extends StatelessWidget {
           label,
           style: const TextStyle(
             fontSize: 14,
-            color: AppColors.textDark,
+            color: AppColors.textGray,
           ),
         ),
         Text(
           value,
           style: const TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
             color: AppColors.textDark,
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildIncludedItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.check_circle, color: AppColors.primary, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 15,
-                color: AppColors.textDark,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildNotIncludedItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.cancel, color: AppColors.primary, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 15,
-                color: AppColors.textDark,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

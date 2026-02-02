@@ -1,9 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart'; // ✅ ADD: For debugPrint
 import '../models/user_model.dart';
 import '../models/technician_model.dart';
 import '../models/booking_model.dart';
+import '../models/billing_model.dart';
 import '../firebase_options.dart';
 import 'fcm_service.dart';
 
@@ -38,7 +40,7 @@ class FirebaseService {
           }
         }
         
-        print('🔥 Initializing Firebase Realtime Database with URL: $databaseURL');
+        debugPrint('🔥 Initializing Firebase Realtime Database with URL: $databaseURL');
         
         // ✅ FIX: Use instanceFor with the app and databaseURL
         _realtimeDbInstance = FirebaseDatabase.instanceFor(
@@ -53,9 +55,9 @@ class FirebaseService {
         }
         
         _isInitialized = true;
-        print('✅ Firebase Realtime Database initialized successfully');
+        debugPrint('✅ Firebase Realtime Database initialized successfully');
       } catch (e) {
-        print('❌ Error initializing Firebase Database: $e');
+        debugPrint('❌ Error initializing Firebase Database: $e');
         rethrow;
       }
     }
@@ -67,14 +69,14 @@ class FirebaseService {
   /// Create or update user
   static Future<void> saveUser(UserModel user) async {
     try {
-      print('💾 Saving user: ${user.uid}');
+      debugPrint('💾 Saving user: ${user.uid}');
       final userJson = user.toJson();
-      print('📄 User data: $userJson');
+      debugPrint('📄 User data: $userJson');
       
       await _realtimeDb.ref('users/${user.uid}').set(userJson);
-      print('✅ User saved successfully to Realtime Database');
+      debugPrint('✅ User saved successfully to Realtime Database');
     } catch (e) {
-      print('❌ Error saving user: $e');
+      debugPrint('❌ Error saving user: $e');
       rethrow;
     }
   }
@@ -82,16 +84,16 @@ class FirebaseService {
   /// Get user by ID
   static Future<UserModel?> getUser(String uid) async {
     try {
-      print('🔍 Fetching user: $uid');
+      debugPrint('🔍 Fetching user: $uid');
       final snapshot = await _realtimeDb.ref('users/$uid').get();
       if (snapshot.exists && snapshot.value != null) {
-        print('✅ User found: $uid');
+        debugPrint('✅ User found: $uid');
         return UserModel.fromJson(Map<String, dynamic>.from(snapshot.value as Map));
       }
-      print('⚠️ User not found: $uid');
+      debugPrint('⚠️ User not found: $uid');
       return null;
     } catch (e) {
-      print('❌ Error getting user: $e');
+      debugPrint('❌ Error getting user: $e');
       return null;
     }
   }
@@ -101,9 +103,9 @@ class FirebaseService {
     try {
       data['updatedAt'] = DateTime.now().toIso8601String();
       await _realtimeDb.ref('users/$uid').update(data);
-      print('✅ User updated: $uid');
+      debugPrint('✅ User updated: $uid');
     } catch (e) {
-      print('❌ Error updating user: $e');
+      debugPrint('❌ Error updating user: $e');
       rethrow;
     }
   }
@@ -112,9 +114,9 @@ class FirebaseService {
   static Future<void> deleteUser(String uid) async {
     try {
       await _realtimeDb.ref('users/$uid').remove();
-      print('✅ User deleted: $uid');
+      debugPrint('✅ User deleted: $uid');
     } catch (e) {
-      print('❌ Error deleting user: $e');
+      debugPrint('❌ Error deleting user: $e');
       rethrow;
     }
   }
@@ -124,7 +126,7 @@ class FirebaseService {
   /// Create or update technician - Updated to match backend structure
   static Future<void> saveTechnician(TechnicianModel technician) async {
     try {
-      print('💾 Saving technician: ${technician.uid}');
+      debugPrint('💾 Saving technician: ${technician.uid}');
       
       // Backend structure for technician
       final techJson = {
@@ -146,18 +148,18 @@ class FirebaseService {
         'updatedAt': DateTime.now().toIso8601String(),
       };
       
-      print('🔧 Technician data: $techJson');
+      debugPrint('🔧 Technician data: $techJson');
       
       // 🔑 STEP 2A: Save to main technicians node
       await _realtimeDb.ref('technicians/${technician.uid}').set(techJson);
-      print('✅ Technician saved to main node');
+      debugPrint('✅ Technician saved to main node');
       
       // 🔑 STEP 2B: Save to pincode mapping (matches backend structure)
       await _saveTechnicianToMapping(technician);
       
-      print('✅ Technician saved successfully to Realtime Database');
+      debugPrint('✅ Technician saved successfully to Realtime Database');
     } catch (e) {
-      print('❌ Error saving technician: $e');
+      debugPrint('❌ Error saving technician: $e');
       rethrow;
     }
   }
@@ -165,7 +167,7 @@ class FirebaseService {
   /// 🔑 STEP 2B: Save technician to pincode mapping (Updated to match backend)
   static Future<void> _saveTechnicianToMapping(TechnicianModel technician) async {
     try {
-      print('🗺️ Creating pincode mapping for: ${technician.uid} -> ${technician.primaryPincode}');
+      debugPrint('🗺️ Creating pincode mapping for: ${technician.uid} -> ${technician.primaryPincode}');
       
       // Create mapping data (simplified for backend compatibility)
       final mappingData = {
@@ -179,9 +181,9 @@ class FirebaseService {
           .ref('pincode_map/${technician.primaryPincode}/${technician.uid}')
           .set(mappingData);
       
-      print('✅ Technician mapped to pincode: ${technician.primaryPincode}');
+      debugPrint('✅ Technician mapped to pincode: ${technician.primaryPincode}');
     } catch (e) {
-      print('❌ Error creating pincode mapping: $e');
+      debugPrint('❌ Error creating pincode mapping: $e');
       rethrow;
     }
   }
@@ -189,19 +191,10 @@ class FirebaseService {
   /// Get technician by ID - Updated to handle backend structure
   static Future<TechnicianModel?> getTechnician(String uid) async {
     try {
-      print('🔍 Fetching technician from Realtime DB: $uid');
-      print('🔗 Database URL: ${_realtimeDb.databaseURL}');
-      
       final snapshot = await _realtimeDb.ref('technicians/$uid').get();
       
-      print('📊 Snapshot exists: ${snapshot.exists}');
-      print('📊 Snapshot value: ${snapshot.value}');
-      
       if (snapshot.exists && snapshot.value != null) {
-        print('✅ Raw technician data found: ${snapshot.value}');
-        
         final techData = Map<String, dynamic>.from(snapshot.value as Map);
-        print('🔧 Parsed technician data: $techData');
         
         // Convert backend structure to model structure
         final modelData = {
@@ -215,6 +208,7 @@ class FirebaseService {
           'specializations': techData['specializations'] ?? [],
           'isOnline': techData['status'] == 'online', // Convert status to isOnline
           'totalJobs': techData['totalJobs'] ?? 0,
+          'completedJobs': techData['completedJobs'] ?? 0, // Add this field
           'rating': techData['rating'] ?? 0.0,
           'walletBalance': techData['walletBalance'] ?? 0.0,
           'profileImage': techData['profileImage'],
@@ -223,20 +217,11 @@ class FirebaseService {
         };
         
         final technician = TechnicianModel.fromJson(modelData);
-        print('✅ Technician model created: ${technician.name} (${technician.uid})');
-        print('💰 Wallet: ₹${technician.walletBalance}');
-        print('🏙️ City: ${technician.city}');
-        print('📍 Pincode: ${technician.primaryPincode}');
-        print('🔧 Specializations: ${technician.specializations}');
-        
         return technician;
       }
       
-      print('⚠️ Technician not found in Realtime DB: $uid');
       return null;
     } catch (e, stackTrace) {
-      print('❌ Error getting technician: $e');
-      print('📍 Stack trace: $stackTrace');
       return null;
     }
   }
@@ -244,16 +229,17 @@ class FirebaseService {
   /// Update technician status (online/offline) - Updated to match backend
   static Future<void> updateTechnicianStatus(String uid, bool isOnline) async {
     try {
-      print('🔄 Updating technician status: $uid -> ${isOnline ? "ONLINE" : "OFFLINE"}');
+      debugPrint('🔄 Updating technician status: $uid -> ${isOnline ? 'ONLINE' : 'OFFLINE'}');
       
       // Update main technician node with backend structure
       await _realtimeDb.ref('technicians/$uid').update({
         'status': isOnline ? 'online' : 'offline', // Backend uses 'status' not 'isOnline'
-        'busy': false, // Backend tracks busy state
+        'busy': false, // Reset busy state when updating status
+        'currentBooking': null, // Clear current booking
         'updatedAt': DateTime.now().toIso8601String(),
       });
       
-      // 🔑 Update mapping node status (pincode_map structure)
+      // Update mapping node status (pincode_map structure)
       final techSnapshot = await _realtimeDb.ref('technicians/$uid').get();
       if (techSnapshot.exists && techSnapshot.value != null) {
         final techData = Map<String, dynamic>.from(techSnapshot.value as Map);
@@ -263,13 +249,13 @@ class FirebaseService {
           await _realtimeDb
               .ref('pincode_map/$pincode/$uid')
               .update({'active': isOnline});
-          print('✅ Mapping status updated for pincode: $pincode');
+          debugPrint('✅ Updated pincode mapping: $pincode -> ${isOnline ? 'active' : 'inactive'}');
         }
       }
       
-      print('✅ Technician status updated successfully');
+      debugPrint('✅ Technician status updated successfully');
     } catch (e) {
-      print('❌ Error updating technician status: $e');
+      debugPrint('❌ Error updating technician status: $e');
       rethrow;
     }
   }
@@ -288,9 +274,9 @@ class FirebaseService {
         'rating': rating,
         'updatedAt': DateTime.now().toIso8601String(),
       });
-      print('✅ Technician stats updated: $uid');
+      debugPrint('✅ Technician stats updated: $uid');
     } catch (e) {
-      print('❌ Error updating technician stats: $e');
+      debugPrint('❌ Error updating technician stats: $e');
       rethrow;
     }
   }
@@ -298,14 +284,14 @@ class FirebaseService {
   /// Update technician wallet balance
   static Future<void> updateTechnicianWallet(String uid, double newBalance) async {
     try {
-      print('💰 Updating wallet for technician: $uid to ₹$newBalance');
+      debugPrint('💰 Updating wallet for technician: $uid to ₹$newBalance');
       await _realtimeDb.ref('technicians/$uid').update({
         'walletBalance': newBalance,
         'updatedAt': DateTime.now().toIso8601String(),
       });
-      print('✅ Wallet updated successfully');
+      debugPrint('✅ Wallet updated successfully');
     } catch (e) {
-      print('❌ Error updating technician wallet: $e');
+      debugPrint('❌ Error updating technician wallet: $e');
       rethrow;
     }
   }
@@ -322,7 +308,7 @@ class FirebaseService {
           .where((tech) => tech.city == city && tech.isOnline == true)
           .toList();
     } catch (e) {
-      print('❌ Error getting online technicians: $e');
+      debugPrint('❌ Error getting online technicians: $e');
       return [];
     }
   }
@@ -342,7 +328,7 @@ class FirebaseService {
               tech.specializations.contains(service))
           .toList();
     } catch (e) {
-      print('❌ Error getting technicians by service: $e');
+      debugPrint('❌ Error getting technicians by service: $e');
       return [];
     }
   }
@@ -365,9 +351,29 @@ class FirebaseService {
   static Stream<TechnicianModel?> streamTechnician(String uid) {
     return _realtimeDb.ref('technicians/$uid').onValue.map((event) {
       if (event.snapshot.exists && event.snapshot.value != null) {
-        return TechnicianModel.fromJson(
-          Map<String, dynamic>.from(event.snapshot.value as Map)
-        );
+        final techData = Map<String, dynamic>.from(event.snapshot.value as Map);
+        
+        // Convert backend structure to model structure
+        final modelData = {
+          'uid': techData['uid'] ?? '',
+          'name': techData['name'] ?? '',
+          'mobile': techData['mobile'] ?? '',
+          'email': techData['email'] ?? '',
+          'city': techData['city'] ?? '',
+          'primaryPincode': techData['primaryPincode'] ?? '',
+          'fcmToken': techData['fcmToken'],
+          'specializations': techData['specializations'] ?? [],
+          'isOnline': techData['status'] == 'online', // Convert status to isOnline
+          'totalJobs': techData['totalJobs'] ?? 0,
+          'completedJobs': techData['completedJobs'] ?? 0, // Add this field
+          'rating': techData['rating'] ?? 0.0,
+          'walletBalance': techData['walletBalance'] ?? 0.0,
+          'profileImage': techData['profileImage'],
+          'createdAt': techData['createdAt'],
+          'updatedAt': techData['updatedAt'],
+        };
+        
+        return TechnicianModel.fromJson(modelData);
       }
       return null;
     });
@@ -376,7 +382,7 @@ class FirebaseService {
   /// Update technician's FCM token
   static Future<void> updateTechnicianFCMToken(String uid, String fcmToken) async {
     try {
-      print('🔔 Updating FCM token for technician: $uid');
+      debugPrint('🔔 Updating FCM token for technician: $uid');
       await _realtimeDb.ref('technicians/$uid').update({
         'fcmToken': fcmToken,
         'updatedAt': DateTime.now().toIso8601String(),
@@ -392,13 +398,13 @@ class FirebaseService {
           await _realtimeDb
               .ref('pincode_map/$pincode/$uid')
               .update({'fcm': fcmToken});
-          print('✅ FCM token updated in pincode mapping: $pincode');
+          debugPrint('✅ FCM token updated in pincode mapping: $pincode');
         }
       }
       
-      print('✅ FCM token updated successfully');
+      debugPrint('✅ FCM token updated successfully');
     } catch (e) {
-      print('❌ Error updating FCM token: $e');
+      debugPrint('❌ Error updating FCM token: $e');
       rethrow;
     }
   }
@@ -408,7 +414,7 @@ class FirebaseService {
   /// Accept booking (technician side) - With wallet deduction
   static Future<void> acceptBooking(String bookingId, String technicianId) async {
     try {
-      print('✅ Technician accepting booking: $bookingId');
+      debugPrint('✅ Technician accepting booking: $bookingId');
       
       // Get technician info first
       final techSnapshot = await _realtimeDb.ref('technicians/$technicianId').get();
@@ -420,16 +426,15 @@ class FirebaseService {
       final technicianName = techData['name'] ?? 'Unknown';
       final currentWallet = _toDouble(techData['walletBalance']);
       
-      // Check if technician has enough balance
-      const double jobAcceptanceFee = 199.0;
-      if (currentWallet < jobAcceptanceFee) {
-        throw Exception('Insufficient wallet balance. Need ₹$jobAcceptanceFee to accept job.');
+      // Check if technician has enough balance using GST-compliant system
+      if (!PricingCalculator.canAcceptBooking(currentWallet)) {
+        throw Exception('Insufficient wallet balance. Need ₹${PricingCalculator.FIXED_COMMISSION.toStringAsFixed(0)} to accept job.');
       }
       
       // Calculate new wallet balance
-      final newWalletBalance = currentWallet - jobAcceptanceFee;
+      final newWalletBalance = currentWallet - PricingCalculator.FIXED_COMMISSION;
       
-      print('💰 Wallet: ₹$currentWallet → ₹$newWalletBalance (Fee: ₹$jobAcceptanceFee)');
+      debugPrint('💰 Wallet: ₹$currentWallet → ₹$newWalletBalance (Fee: ₹${PricingCalculator.FIXED_COMMISSION})');
       
       // Try to update booking status
       try {
@@ -441,9 +446,9 @@ class FirebaseService {
           'acceptedAt': DateTime.now().millisecondsSinceEpoch,
           'updatedAt': DateTime.now().toIso8601String(),
         });
-        print('✅ Booking updated successfully');
+        debugPrint('✅ Booking updated successfully');
       } catch (updateError) {
-        print('⚠️ Booking update failed (permission issue): $updateError');
+        debugPrint('⚠️ Booking update failed (permission issue): $updateError');
         // Continue anyway - the job flow can still work
       }
       
@@ -460,7 +465,7 @@ class FirebaseService {
         'technicianId': technicianId,
         'bookingId': bookingId,
         'type': 'job_acceptance_fee',
-        'amount': -jobAcceptanceFee,
+        'amount': -PricingCalculator.FIXED_COMMISSION,
         'previousBalance': currentWallet,
         'newBalance': newWalletBalance,
         'description': 'Job acceptance fee for booking $bookingId',
@@ -468,10 +473,10 @@ class FirebaseService {
         'createdAt': DateTime.now().toIso8601String(),
       });
       
-      print('✅ Booking accepted successfully by $technicianName');
-      print('💰 ₹$jobAcceptanceFee deducted from wallet');
+      debugPrint('✅ Booking accepted successfully by $technicianName');
+      debugPrint('💰 ₹${PricingCalculator.FIXED_COMMISSION} deducted from wallet');
     } catch (e) {
-      print('❌ Error accepting booking: $e');
+      debugPrint('❌ Error accepting booking: $e');
       rethrow;
     }
   }
@@ -487,8 +492,6 @@ class FirebaseService {
   /// Reject booking (technician side) - Matches backend logic  
   static Future<void> rejectBooking(String bookingId, String technicianId) async {
     try {
-      print('❌ Technician rejecting booking: $bookingId');
-      
       // Add to reject log
       await _realtimeDb.ref('reject_log/$bookingId/$technicianId').set(true);
       
@@ -502,9 +505,7 @@ class FirebaseService {
         'updatedAt': DateTime.now().toIso8601String(),
       });
       
-      print('✅ Booking rejected successfully');
     } catch (e) {
-      print('❌ Error rejecting booking: $e');
       rethrow;
     }
   }
@@ -514,15 +515,11 @@ class FirebaseService {
     required String pincode,
     required List<String> specializations,
   }) {
-    debugPrint('🔍 Streaming pending bookings for pincode: $pincode');
-    debugPrint('🔧 Technician specializations: $specializations');
-    
     return _realtimeDb.ref('bookings')
-        .onValue  // ✅ CHANGE: Get ALL bookings, then filter
+        .onValue
         .map((event) {
       if (event.snapshot.exists && event.snapshot.value != null) {
         final bookingsMap = Map<String, dynamic>.from(event.snapshot.value as Map);
-        debugPrint('📊 Total bookings in database: ${bookingsMap.length}');
         
         final filteredBookings = bookingsMap.entries
             .map((entry) {
@@ -531,10 +528,21 @@ class FirebaseService {
               return BookingModel.fromJson(bookingData);
             })
             .where((booking) {
-              // ✅ CHANGE: Include both 'pending' AND 'confirmed' status
-              final statusMatch = booking.status == 'pending' || booking.status == 'confirmed';
+              // ✅ CRITICAL FIX: Exclude ALL non-pending jobs
+              // Only show pending and confirmed jobs to technicians
+              if (booking.status != 'pending' && booking.status != 'confirmed') {
+                debugPrint('🚫 Filtering out job ${booking.id} with status: ${booking.status}');
+                return false;
+              }
               
-              // ✅ FIX: Handle missing pincode by extracting from address
+              // Check if booking is expired (older than 24 hours)
+              final isExpired = _isBookingExpired(booking);
+              if (isExpired) {
+                debugPrint('⏰ Filtering out expired job ${booking.id}');
+                return false;
+              }
+              
+              // Handle missing pincode by extracting from address
               String? bookingPincode = booking.pincode;
               if (bookingPincode == null || bookingPincode.isEmpty) {
                 // Try to extract pincode from address (last 6 digits)
@@ -551,22 +559,39 @@ class FirebaseService {
               final serviceMatch = specializations.contains(booking.service) || 
                                  _isServiceMatch(booking.service, specializations);
               
-              debugPrint('📋 Booking ${booking.id}: status=${booking.status}, pincode=$bookingPincode (extracted), service=${booking.service}');
-              debugPrint('🎯 Match: status=$statusMatch, pincode=$pincodeMatch, service=$serviceMatch');
-              debugPrint('    Created: ${booking.createdAt}, Scheduled: ${booking.scheduledTime}');
-              debugPrint('    Address: ${booking.address}');
+              final shouldShow = pincodeMatch && serviceMatch;
+              if (shouldShow) {
+                debugPrint('✅ Showing job ${booking.id}: ${booking.service} in $bookingPincode');
+              }
               
-              return statusMatch && pincodeMatch && serviceMatch;
+              return shouldShow;
             })
             .toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
         
-        debugPrint('✅ Found ${filteredBookings.length} matching bookings for pincode $pincode');
+        debugPrint('📋 Filtered ${filteredBookings.length} jobs for technician in $pincode');
         return filteredBookings;
       }
-      debugPrint('⚠️ No bookings found in database');
       return <BookingModel>[];
     });
+  }
+
+  /// Check if a booking is expired (older than 24 hours)
+  static bool _isBookingExpired(BookingModel booking) {
+    try {
+      final now = DateTime.now();
+      final createdAt = booking.createdAt; // Already a DateTime object
+      final hoursDifference = now.difference(createdAt).inHours;
+      
+      // Consider booking expired if it's older than 24 hours and still pending
+      if (hoursDifference > 24 && (booking.status == 'pending' || booking.status == 'confirmed')) {
+        return true;
+      }
+      
+      return false;
+    } catch (e) {
+      return false; // Don't filter out if we can't determine
+    }
   }
 
   /// Stream technician's assigned bookings (real-time)
@@ -593,8 +618,8 @@ class FirebaseService {
   /// Create new booking with pincode
   static Future<String> createBooking(BookingModel booking) async {
     try {
-      print('📝 Creating booking in Realtime Database...');
-      print('🔑 Booking pincode: ${booking.pincode}');
+      debugPrint('📝 Creating booking in Realtime Database...');
+      debugPrint('🔑 Booking pincode: ${booking.pincode}');
       
       // ✅ Use the singleton _realtimeDb instance
       final bookingRef = _realtimeDb.ref('bookings').push();
@@ -603,16 +628,16 @@ class FirebaseService {
       final bookingJson = booking.toJson();
       bookingJson['id'] = bookingId;
       
-      print('📄 Booking data: $bookingJson');
+      debugPrint('📄 Booking data: $bookingJson');
       await bookingRef.set(bookingJson);
-      print('✅ Booking created with ID: $bookingId');
+      debugPrint('✅ Booking created with ID: $bookingId');
       
       // 🔔 NEW: Send push notification to technicians in the area
       await _sendBookingNotificationToTechnicians(booking.copyWith(id: bookingId));
       
       return bookingId;
     } catch (e) {
-      print('❌ Error creating booking: $e');
+      debugPrint('❌ Error creating booking: $e');
       rethrow;
     }
   }
@@ -620,18 +645,20 @@ class FirebaseService {
   /// Send push notification to technicians in the booking area
   static Future<void> _sendBookingNotificationToTechnicians(BookingModel booking) async {
     try {
-      print('🔔 Sending notifications for booking: ${booking.id}');
-      print('🔔 Service: ${booking.service}, Pincode: ${booking.pincode}');
+      debugPrint('🔔 NOTIFICATION DEBUG: Sending notifications for booking ${booking.id}');
+      debugPrint('🔔 Booking details: ${booking.service} in ${booking.pincode} for ${booking.userName}');
       
       // Get technicians in the same pincode with matching specializations
       final snapshot = await _realtimeDb.ref('technicians').get();
       if (!snapshot.exists || snapshot.value == null) {
-        print('⚠️ No technicians found in database');
+        debugPrint('❌ NOTIFICATION DEBUG: No technicians found in database');
         return;
       }
       
       final techniciansMap = Map<String, dynamic>.from(snapshot.value as Map);
       final matchingTechnicians = <Map<String, String>>[];
+      
+      debugPrint('🔔 NOTIFICATION DEBUG: Found ${techniciansMap.length} total technicians');
       
       for (final entry in techniciansMap.entries) {
         final techData = Map<String, dynamic>.from(entry.value);
@@ -642,32 +669,54 @@ class FirebaseService {
         final techName = techData['name']?.toString() ?? 'Unknown';
         final techId = entry.key;
         
+        debugPrint('🔔 CHECKING TECHNICIAN: $techName ($techId)');
+        debugPrint('  - Pincode: $techPincode (booking: ${booking.pincode})');
+        debugPrint('  - Online: $isOnline');
+        debugPrint('  - Specializations: $techSpecializations');
+        debugPrint('  - FCM Token: ${techFcmToken?.isNotEmpty == true ? 'Present' : 'Missing'}');
+        
+        // Check pincode match
+        final pincodeMatch = techPincode == booking.pincode;
+        debugPrint('  - Pincode Match: $pincodeMatch');
+        
+        // Check service match
+        final directServiceMatch = techSpecializations.contains(booking.service);
+        final mappedServiceMatch = _isServiceMatch(booking.service, techSpecializations);
+        final serviceMatch = directServiceMatch || mappedServiceMatch;
+        debugPrint('  - Service Match: $serviceMatch (direct: $directServiceMatch, mapped: $mappedServiceMatch)');
+        
         // Check if technician matches booking criteria
-        if (techPincode == booking.pincode && 
+        if (pincodeMatch && 
             isOnline && 
             techFcmToken != null && 
             techFcmToken.isNotEmpty &&
-            (techSpecializations.contains(booking.service) || 
-             _isServiceMatch(booking.service, techSpecializations))) {
+            serviceMatch) {
           matchingTechnicians.add({
             'id': techId,
             'name': techName,
             'token': techFcmToken,
           });
-          print('🎯 Matching technician: $techName ($techId) - Token: ${techFcmToken.substring(0, 10)}...');
+          debugPrint('  ✅ TECHNICIAN MATCHES - Will send notification');
+        } else {
+          debugPrint('  ❌ TECHNICIAN DOES NOT MATCH');
+          if (!pincodeMatch) debugPrint('    - Reason: Pincode mismatch');
+          if (!isOnline) debugPrint('    - Reason: Technician offline');
+          if (techFcmToken == null || techFcmToken.isEmpty) debugPrint('    - Reason: No FCM token');
+          if (!serviceMatch) debugPrint('    - Reason: Service mismatch');
         }
       }
       
-      print('📱 Sending notifications to ${matchingTechnicians.length} technicians');
+      debugPrint('🔔 NOTIFICATION DEBUG: Found ${matchingTechnicians.length} matching technicians');
       
       if (matchingTechnicians.isEmpty) {
-        print('⚠️ No matching technicians found for pincode ${booking.pincode}');
+        debugPrint('❌ NOTIFICATION DEBUG: No matching technicians found - no notifications sent');
         return;
       }
       
       // Send notifications using FCM service
       for (final tech in matchingTechnicians) {
         try {
+          debugPrint('🔔 SENDING NOTIFICATION TO: ${tech['name']} (${tech['id']})');
           await FCMService.sendNotificationToToken(
             token: tech['token']!,
             title: '🔔 New Job Available!',
@@ -682,25 +731,32 @@ class FirebaseService {
               'scheduledTime': booking.scheduledTime,
             },
           );
-          print('✅ Notification sent to ${tech['name']}: ${tech['token']!.substring(0, 10)}...');
+          debugPrint('✅ NOTIFICATION SENT TO: ${tech['name']}');
         } catch (e) {
-          print('❌ Failed to send notification to ${tech['name']}: $e');
+          debugPrint('❌ FAILED TO SEND NOTIFICATION TO: ${tech['name']} - Error: $e');
+          // Continue sending to other technicians even if one fails
         }
       }
       
       // Also send enhanced job alert to area
-      await FCMService.sendJobAlertToArea(
-        pincode: booking.pincode ?? '',
-        service: booking.service,
-        bookingId: booking.id,
-        amount: booking.totalAmount,
-        customerName: booking.userName,
-        scheduledTime: booking.scheduledTime,
-      );
+      try {
+        debugPrint('🔔 SENDING AREA ALERT for pincode: ${booking.pincode}');
+        await FCMService.sendJobAlertToArea(
+          pincode: booking.pincode ?? '',
+          service: booking.service,
+          bookingId: booking.id,
+          amount: booking.totalAmount,
+          customerName: booking.userName,
+          scheduledTime: booking.scheduledTime,
+        );
+        debugPrint('✅ AREA ALERT SENT');
+      } catch (e) {
+        debugPrint('❌ AREA ALERT FAILED: $e');
+      }
       
-      print('✅ Notification sending process completed for ${matchingTechnicians.length} technicians');
     } catch (e) {
-      print('❌ Error sending notifications: $e');
+      debugPrint('❌ NOTIFICATION DEBUG: Error in _sendBookingNotificationToTechnicians: $e');
+      // Don't block booking creation for notification failures
     }
   }
 
@@ -713,7 +769,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('❌ Error getting booking: $e');
+      debugPrint('❌ Error getting booking: $e');
       return null;
     }
   }
@@ -726,9 +782,9 @@ class FirebaseService {
         'status': status,
         'updatedAt': DateTime.now().toIso8601String(),
       });
-      print('✅ Booking status updated: $bookingId -> $status');
+      debugPrint('✅ Booking status updated: $bookingId -> $status');
     } catch (e) {
-      print('❌ Error updating booking status: $e');
+      debugPrint('❌ Error updating booking status: $e');
       rethrow;
     }
   }
@@ -742,9 +798,9 @@ class FirebaseService {
         'paymentStatus': 'completed',
         'updatedAt': DateTime.now().toIso8601String(),
       });
-      print('✅ Payment ID updated: $bookingId -> $paymentId');
+      debugPrint('✅ Payment ID updated: $bookingId -> $paymentId');
     } catch (e) {
-      print('❌ Error updating payment ID: $e');
+      debugPrint('❌ Error updating payment ID: $e');
       rethrow;
     }
   }
@@ -759,7 +815,7 @@ class FirebaseService {
     required double totalAmount,
   }) async {
     try {
-      print('💰 Updating booking order details: $bookingId');
+      debugPrint('💰 Updating booking order details: $bookingId');
       await _realtimeDb.ref('bookings/$bookingId').update({
         'razorpayOrderId': razorpayOrderId,
         'visitingCharge': visitingCharge,
@@ -768,9 +824,9 @@ class FirebaseService {
         'totalAmount': totalAmount,
         'updatedAt': DateTime.now().toIso8601String(),
       });
-      print('✅ Booking order details updated successfully');
+      debugPrint('✅ Booking order details updated successfully');
     } catch (e) {
-      print('❌ Error updating booking order details: $e');
+      debugPrint('❌ Error updating booking order details: $e');
       rethrow;
     }
   }
@@ -785,9 +841,9 @@ class FirebaseService {
         'status': 'accepted',
         'updatedAt': DateTime.now().toIso8601String(),
       });
-      print('✅ Technician assigned to booking: $bookingId');
+      debugPrint('✅ Technician assigned to booking: $bookingId');
     } catch (e) {
-      print('❌ Error assigning technician: $e');
+      debugPrint('❌ Error assigning technician: $e');
       rethrow;
     }
   }
@@ -795,7 +851,7 @@ class FirebaseService {
   /// Get user's bookings
   static Future<List<BookingModel>> getUserBookings(String userId) async {
     try {
-      print('🔍 Fetching bookings for user: $userId');
+      debugPrint('🔍 Fetching bookings for user: $userId');
       final snapshot = await _realtimeDb.ref('bookings')
           .orderByChild('userId')
           .equalTo(userId)
@@ -808,13 +864,13 @@ class FirebaseService {
             .toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
         
-        print('✅ Found ${bookings.length} bookings for user');
+        debugPrint('✅ Found ${bookings.length} bookings for user');
         return bookings;
       }
-      print('⚠️ No bookings found for user');
+      debugPrint('⚠️ No bookings found for user');
       return [];
     } catch (e) {
-      print('❌ Error getting user bookings: $e');
+      debugPrint('❌ Error getting user bookings: $e');
       return [];
     }
   }
@@ -823,7 +879,7 @@ class FirebaseService {
   static Future<List<BookingModel>> getTechnicianBookings(
       String technicianId) async {
     try {
-      print('🔍 Fetching bookings for technician: $technicianId');
+      debugPrint('🔍 Fetching bookings for technician: $technicianId');
       final snapshot = await _realtimeDb.ref('bookings')
           .orderByChild('technicianId')
           .equalTo(technicianId)
@@ -836,13 +892,13 @@ class FirebaseService {
             .toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
         
-        print('✅ Found ${bookings.length} bookings for technician');
+        debugPrint('✅ Found ${bookings.length} bookings for technician');
         return bookings;
       }
-      print('⚠️ No bookings found for technician');
+      debugPrint('⚠️ No bookings found for technician');
       return [];
     } catch (e) {
-      print('❌ Error getting technician bookings: $e');
+      debugPrint('❌ Error getting technician bookings: $e');
       return [];
     }
   }
@@ -853,7 +909,7 @@ class FirebaseService {
     required List<String> specializations,
   }) async {
     try {
-      print('🔍 Fetching pending bookings for city: $city');
+      debugPrint('🔍 Fetching pending bookings for city: $city');
       final snapshot = await _realtimeDb.ref('bookings')
           .orderByChild('status')
           .equalTo('pending')
@@ -868,64 +924,110 @@ class FirebaseService {
                 (booking.city?.contains(city) ?? booking.address?.contains(city) ?? false))
             .toList();
         
-        print('✅ Found ${filteredBookings.length} pending bookings');
+        debugPrint('✅ Found ${filteredBookings.length} pending bookings');
         return filteredBookings;
       }
-      print('⚠️ No pending bookings found');
       return [];
     } catch (e) {
-      print('❌ Error getting pending bookings: $e');
+      debugPrint('❌ Error getting pending bookings: $e');
       return [];
+    }
+  }
+
+  /// Increment technician's completed jobs count
+  static Future<void> incrementTechnicianCompletedJobs(String technicianId) async {
+    try {
+      debugPrint('📊 Incrementing completed jobs for technician: $technicianId');
+      
+      // Get current technician data
+      final snapshot = await _realtimeDb.ref('technicians/$technicianId').get();
+      
+      if (snapshot.exists && snapshot.value != null) {
+        final techData = Map<String, dynamic>.from(snapshot.value as Map);
+        final currentCompletedJobs = techData['completedJobs'] ?? 0;
+        final newCompletedJobs = currentCompletedJobs + 1;
+        
+        // Update completed jobs count
+        await _realtimeDb.ref('technicians/$technicianId').update({
+          'completedJobs': newCompletedJobs,
+          'updatedAt': DateTime.now().toIso8601String(),
+        });
+        
+        debugPrint('✅ Updated completed jobs: $currentCompletedJobs → $newCompletedJobs');
+      } else {
+        debugPrint('⚠️ Technician not found, creating completed jobs field');
+        await _realtimeDb.ref('technicians/$technicianId').update({
+          'completedJobs': 1,
+          'updatedAt': DateTime.now().toIso8601String(),
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error incrementing completed jobs: $e');
+      throw Exception('Failed to update technician stats: $e');
+    }
+  }
+
+  /// Complete job and clear technician status
+  static Future<void> completeJobAndClearTechnician(String bookingId, String technicianId) async {
+    try {
+      debugPrint('🎯 Completing job and clearing technician status: $bookingId');
+      
+      // 1. Update booking status to completed
+      await updateBookingStatus(bookingId, 'completed');
+      
+      // 2. Increment technician's completed jobs count
+      await incrementTechnicianCompletedJobs(technicianId);
+      
+      // 3. Clear technician's busy status and current booking - KEEP ONLINE STATUS
+      final techSnapshot = await _realtimeDb.ref('technicians/$technicianId').get();
+      if (techSnapshot.exists && techSnapshot.value != null) {
+        final techData = Map<String, dynamic>.from(techSnapshot.value as Map);
+        final currentStatus = techData['status'] ?? 'offline'; // Preserve current online/offline status
+        
+        await _realtimeDb.ref('technicians/$technicianId').update({
+          'status': currentStatus, // Keep the same online/offline status
+          'busy': false, // Clear busy status
+          'currentBooking': null, // Clear current booking
+          'updatedAt': DateTime.now().toIso8601String(),
+        });
+        
+        debugPrint('✅ Technician status cleared - Status: $currentStatus, Busy: false');
+      }
+      
+      debugPrint('✅ Job completion process finished successfully');
+    } catch (e) {
+      debugPrint('❌ Error completing job: $e');
+      rethrow;
     }
   }
 
   /// Stream user's bookings (real-time updates)
   static Stream<List<BookingModel>> streamUserBookings(String userId) {
-    debugPrint('🔄 Streaming bookings for user: $userId');
-    
     return _realtimeDb.ref('bookings')
         .orderByChild('userId')
         .equalTo(userId)
         .onValue
         .asyncMap((event) async {
       try {
-        debugPrint('📡 Stream event received for user: $userId');
-        debugPrint('📡 Event type: ${event.type}');
-        debugPrint('📡 Snapshot exists: ${event.snapshot.exists}');
-        
         if (event.snapshot.exists && event.snapshot.value != null) {
           final bookingsMap = Map<String, dynamic>.from(event.snapshot.value as Map);
-          debugPrint('📡 Raw bookings map keys: ${bookingsMap.keys.toList()}');
           
           final bookings = bookingsMap.entries
               .map((entry) {
                 final bookingData = Map<String, dynamic>.from(entry.value);
                 bookingData['id'] = entry.key; // Add the booking ID
-                debugPrint('📡 Processing booking: ${entry.key} | Status: ${bookingData['status']} | Service: ${bookingData['service']}');
                 return BookingModel.fromJson(bookingData);
               })
               .toList()
             ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
           
-          debugPrint('📋 Streamed ${bookings.length} bookings for user $userId');
-          
-          // Log each booking for debugging
-          for (var booking in bookings) {
-            debugPrint('  📋 ${booking.service} | ${booking.status} | ${booking.createdAt} | ID: ${booking.id}');
-          }
-          
           return bookings;
         }
-        debugPrint('⚠️ No bookings found for user $userId');
         return <BookingModel>[];
-      } catch (e, stackTrace) {
-        debugPrint('❌ Error in stream for user $userId: $e');
-        debugPrint('❌ Stack trace: $stackTrace');
-        
+      } catch (e) {
         // Check if it's a permission error
         final errorStr = e.toString().toLowerCase();
         if (errorStr.contains('permission') || errorStr.contains('denied')) {
-          debugPrint('🔒 Permission denied error detected - this might resolve automatically');
           // Return empty list for permission errors to avoid breaking the UI
           return <BookingModel>[];
         }
@@ -934,7 +1036,6 @@ class FirebaseService {
         rethrow;
       }
     }).handleError((error) {
-      debugPrint('❌ Stream error handler: $error');
       // Return empty stream on error to prevent UI crashes
       return <BookingModel>[];
     });
@@ -996,7 +1097,7 @@ class FirebaseService {
     final serviceMap = {
       // AC Related Services
       'General Service': ['AC Repair', 'Appliance Repair'],
-      'Normal Service': ['AC Repair', 'Appliance Repair'], // NEW
+      'Normal Service': ['AC Repair', 'Appliance Repair'],
       'AC Installation': ['AC Repair'],
       'AC Service': ['AC Repair'],
       'AC Repair Service': ['AC Repair'],
@@ -1004,8 +1105,8 @@ class FirebaseService {
       'Window AC Service': ['AC Repair'],
       'AC Gas Filling': ['AC Repair'],
       'AC Cleaning': ['AC Repair'],
-      'AC Uninstallation': ['AC Repair'], // NEW
-      'Foam Service': ['AC Repair'], // NEW
+      'AC Uninstallation': ['AC Repair'],
+      'Foam Service': ['AC Repair'],
       
       // Appliance Services
       'Jet Machine Service': ['Appliance Repair'],
@@ -1013,15 +1114,15 @@ class FirebaseService {
       'Washing Machine Service': ['Appliance Repair'],
       'Refrigerator Repair': ['Appliance Repair'],
       'Refrigerator Service': ['Appliance Repair'],
-      'Single Door - Slow Working': ['Appliance Repair'], // NEW
-      'Single Door - Gas Refill': ['Appliance Repair'], // NEW
+      'Single Door - Slow Working': ['Appliance Repair'],
+      'Single Door - Gas Refill': ['Appliance Repair'],
       'Microwave Repair': ['Appliance Repair'],
       'Water Purifier Service': ['Appliance Repair'],
       'Chimney Service': ['Appliance Repair'],
       'Gas Refilling': ['Appliance Repair'],
       
       // Installation Services
-      'Installation - Inspection Required': ['AC Repair', 'Appliance Repair'], // NEW
+      'Installation - Inspection Required': ['AC Repair', 'Appliance Repair'],
       
       // Carpenter Services
       'Carpenter Work': ['Carpenter'],
@@ -1031,8 +1132,6 @@ class FirebaseService {
     
     final mappedServices = serviceMap[bookingService] ?? [];
     final hasMatch = specializations.any((spec) => mappedServices.contains(spec));
-    
-    debugPrint('🔧 Service mapping: $bookingService → $mappedServices → Match: $hasMatch');
     
     return hasMatch;
   }

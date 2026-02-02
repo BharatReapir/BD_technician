@@ -159,7 +159,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                       ),
                       // ONLINE/OFFLINE Toggle Button
                       GestureDetector(
-                        onTap: () => _forceOnlineStatus(currentTechnician),
+                        onTap: () => _toggleOnlineStatus(currentTechnician),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           decoration: BoxDecoration(
@@ -224,7 +224,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: _buildStatCard(
-                      '${currentTechnician.totalJobs}',
+                      '${currentTechnician.completedJobs ?? 0}',
                       'Jobs Done',
                       Icons.work,
                     ),
@@ -270,22 +270,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                           specializations: currentTechnician.specializations,
                         ),
                         builder: (context, snapshot) {
-                          debugPrint('🔧 === TECHNICIAN JOB STREAM DEBUG ===');
-                          debugPrint('🔧 Technician: ${currentTechnician.name}');
-                          debugPrint('🔧 Technician Pincode: ${currentTechnician.primaryPincode}');
-                          debugPrint('🔧 Technician Specializations: ${currentTechnician.specializations}');
-                          debugPrint('🔧 Stream State: ${snapshot.connectionState}');
-                          debugPrint('🔧 Has Error: ${snapshot.hasError}');
-                          debugPrint('🔧 Error: ${snapshot.error}');
-                          debugPrint('🔧 Has Data: ${snapshot.hasData}');
-                          debugPrint('🔧 Jobs Count: ${snapshot.data?.length ?? 0}');
-                          
                           if (snapshot.connectionState == ConnectionState.waiting) {
                             return const Center(child: CircularProgressIndicator());
                           }
                           
                           if (snapshot.hasError) {
-                            debugPrint('❌ Stream error: ${snapshot.error}');
                             return Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -306,12 +295,6 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                           }
                           
                           final bookings = snapshot.data ?? [];
-                          debugPrint('📋 Found ${bookings.length} jobs for technician');
-                          
-                          for (var booking in bookings) {
-                            debugPrint('  📋 Job: ${booking.service} | Pincode: ${booking.pincode} | Status: ${booking.status} | ID: ${booking.id}');
-                            debugPrint('      Created: ${booking.createdAt} | Scheduled: ${booking.scheduledTime}');
-                          }
                           
                           if (bookings.isEmpty) {
                             return Center(
@@ -348,43 +331,20 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 16),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      ElevatedButton(
-                                        onPressed: () => _forceOnlineStatus(currentTechnician),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.green,
-                                        ),
-                                        child: const Text('FORCE ONLINE'),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      ElevatedButton(
-                                        onPressed: () => _debugBookings(currentTechnician),
-                                        child: const Text('Debug Jobs'),
-                                      ),
-                                    ],
+                                  ElevatedButton(
+                                    onPressed: () => _forceOnlineStatus(currentTechnician),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.green,
+                                    ),
+                                    child: const Text('GO ONLINE'),
                                   ),
                                   const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      ElevatedButton(
-                                        onPressed: () => _testNotifications(),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.blue,
-                                        ),
-                                        child: const Text('Test Notif'),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      ElevatedButton(
-                                        onPressed: () => _fixBookingPincodes(),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.orange,
-                                        ),
-                                        child: const Text('Fix Pincodes'),
-                                      ),
-                                    ],
+                                  OutlinedButton(
+                                    onPressed: () => _testNotifications(),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppColors.primary,
+                                    ),
+                                    child: const Text('Test Notifications'),
                                   ),
                                 ],
                               ),
@@ -528,6 +488,85 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                         icon: Icons.pin_drop,
                         label: 'Primary Pincode',
                         value: currentTechnician.primaryPincode,
+                      ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // ✅ NEW: Job Statistics Section
+                      const Text(
+                        'Job Statistics',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.green.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.green,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.check_circle,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${currentTechnician.completedJobs ?? 0}',
+                                    style: const TextStyle(
+                                      fontSize: 28,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green,
+                                    ),
+                                  ),
+                                  const Text(
+                                    'Jobs Completed',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black54,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if ((currentTechnician.completedJobs ?? 0) > 0) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.green,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Text(
+                                  '🎉 Great Work!',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                       
                       const SizedBox(height: 20),
@@ -873,36 +912,32 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => _rejectBooking(booking.id!, technician.uid),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Colors.red,
-                          side: const BorderSide(color: Colors.red, width: 2),
-                        ),
-                        child: const Text('Reject'),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => {
+                      debugPrint('🎯 ACCEPT BUTTON PRESSED'),
+                      debugPrint('🎯 Booking ID from card: ${booking.id}'),
+                      debugPrint('🎯 Booking service: ${booking.service}'),
+                      debugPrint('🎯 Booking customer: ${booking.userName}'),
+                      _acceptBooking(booking.id!, technician.uid, technician.name)
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => {
-                          debugPrint('🎯 ACCEPT BUTTON PRESSED'),
-                          debugPrint('🎯 Booking ID from card: ${booking.id}'),
-                          debugPrint('🎯 Booking service: ${booking.service}'),
-                          debugPrint('🎯 Booking customer: ${booking.userName}'),
-                          _acceptBooking(booking.id!, technician.uid, technician.name)
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('Accept'),
+                    child: const Text(
+                      'Accept Job',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
@@ -1047,220 +1082,113 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     }
   }
 
-  Future<void> _fixServiceNames() async {
+  /// Toggle technician online/offline status
+  Future<void> _toggleOnlineStatus(TechnicianModel technician) async {
     try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Text('Fixing service names...'),
-            ],
-          ),
-        ),
-      );
-      
-      // Get all bookings and fix service names
-      final database = FirebaseDatabase.instanceFor(
-        app: Firebase.app(),
-        databaseURL: 'https://bharatapp-4e9c8-default-rtdb.asia-southeast1.firebasedatabase.app/',
-      );
-      
-      final snapshot = await database.ref('bookings').get();
-      if (!snapshot.exists || snapshot.value == null) {
-        if (mounted) Navigator.of(context).pop();
-        return;
-      }
-      
-      final bookingsMap = Map<String, dynamic>.from(snapshot.value as Map);
-      int fixedCount = 0;
-      
-      // Service name fixes
-      final serviceFixes = {
-        'General Service': 'AC Repair',
-        'AC Installation': 'AC Repair', 
-        'AC Service': 'AC Repair',
-        'Jet Machine Service': 'Appliance Repair',
-      };
-      
-      for (final entry in bookingsMap.entries) {
-        final bookingId = entry.key;
-        final bookingData = Map<String, dynamic>.from(entry.value);
-        final currentService = bookingData['service']?.toString() ?? '';
-        
-        if (serviceFixes.containsKey(currentService)) {
-          final newService = serviceFixes[currentService];
-          if (newService != null) {
-            await database.ref('bookings/$bookingId').update({
-              'service': newService,
-              'updatedAt': DateTime.now().toIso8601String(),
-            });
-            
-            debugPrint('✅ Fixed booking $bookingId: $currentService → $newService');
-            fixedCount++;
-          }
-        }
-      }
-      
-      if (mounted) {
-        Navigator.of(context).pop(); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Fixed $fixedCount service names! Jobs should appear now.'),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        
-        // Trigger a refresh
-        setState(() {});
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.of(context).pop(); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error fixing services: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _fixBookingPincodes() async {
-    try {
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Text('Fixing booking pincodes...'),
-            ],
-          ),
-        ),
-      );
-      
-      await FirebaseService.fixBookingPincodes();
-      
-      if (mounted) {
-        Navigator.of(context).pop(); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Booking pincodes fixed! Jobs should appear now.'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-        
-        // Trigger a refresh
-        setState(() {});
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.of(context).pop(); // Close loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error fixing pincodes: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _debugBookings(TechnicianModel technician) async {
-    try {
-      debugPrint('🔍 === MANUAL BOOKING DEBUG ===');
-      debugPrint('🔍 Technician: ${technician.name}');
-      debugPrint('🔍 Technician Pincode: ${technician.primaryPincode}');
-      debugPrint('🔍 Technician Specializations: ${technician.specializations}');
+      final newStatus = !technician.isOnline;
       
       // Show loading
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
+        builder: (context) => AlertDialog(
+          content: Row(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(width: 16),
+              Text(newStatus ? 'Going ONLINE...' : 'Going OFFLINE...'),
+            ],
+          ),
+        ),
       );
       
-      // Get all bookings from Firebase to debug
-      final database = FirebaseDatabase.instanceFor(
-        app: Firebase.app(),
-        databaseURL: 'https://bharatapp-4e9c8-default-rtdb.asia-southeast1.firebasedatabase.app/',
-      );
-      final snapshot = await database.ref('bookings').get();
+      // Update status in Firebase
+      await FirebaseService.updateTechnicianStatus(technician.uid, newStatus);
       
-      if (snapshot.exists && snapshot.value != null) {
-        final bookingsMap = Map<String, dynamic>.from(snapshot.value as Map);
-        debugPrint('📊 Total bookings in database: ${bookingsMap.length}');
-        
-        final allBookings = bookingsMap.entries
-            .map((entry) {
-              final bookingData = Map<String, dynamic>.from(entry.value);
-              bookingData['id'] = entry.key;
-              return BookingModel.fromJson(bookingData);
-            })
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        
-        // Filter recent bookings (last 24 hours)
-        final now = DateTime.now();
-        final recentBookings = allBookings.where((b) => 
-          now.difference(b.createdAt).inHours < 24
-        ).toList();
-        
-        debugPrint('📅 Recent bookings (24h): ${recentBookings.length}');
-        
-        for (var booking in recentBookings) {
-          debugPrint('  📋 ${booking.service} | Status: ${booking.status} | Pincode: ${booking.pincode}');
-          debugPrint('      Created: ${booking.createdAt} | Scheduled: ${booking.scheduledTime}');
-          debugPrint('      ID: ${booking.id}');
-        }
-        
-        // Check matches for this technician
-        final matchingBookings = recentBookings.where((booking) {
-          final statusMatch = booking.status == 'pending' || booking.status == 'confirmed';
-          final pincodeMatch = booking.pincode == technician.primaryPincode;
-          final serviceMatch = technician.specializations.contains(booking.service);
-          return statusMatch && pincodeMatch && serviceMatch;
-        }).toList();
-        
-        debugPrint('🎯 Matching bookings for ${technician.name}: ${matchingBookings.length}');
-        
-        if (mounted) {
-          Navigator.of(context).pop(); // Close loading
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Debug: Total=${allBookings.length}, Recent=${recentBookings.length}, Matching=${matchingBookings.length}'),
-              duration: const Duration(seconds: 5),
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          Navigator.of(context).pop(); // Close loading
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No bookings found in database'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('❌ Debug error: $e');
+      // Update the auth provider
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.refreshTechnicianData();
+      
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Show success message
       if (mounted) {
-        Navigator.of(context).pop(); // Close loading
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Debug error: $e'),
+            content: Text(newStatus 
+                ? 'You are now ONLINE! You will receive job notifications.' 
+                : 'You are now OFFLINE. You will not receive job notifications.'),
+            backgroundColor: newStatus ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      
+    } catch (e) {
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update status: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Force technician online status
+  Future<void> _forceOnlineStatus(TechnicianModel technician) async {
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Going ONLINE...'),
+            ],
+          ),
+        ),
+      );
+      
+      // Force update to ONLINE in Firebase
+      await FirebaseService.updateTechnicianStatus(technician.uid, true);
+      
+      // Also update the auth provider
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.refreshTechnicianData();
+      
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('You are now ONLINE! You will receive job notifications.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+      
+    } catch (e) {
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Show error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to go online: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1299,7 +1227,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   const Icon(Icons.notifications, color: Colors.white, size: 24),
                   const SizedBox(width: 12),
                   const Text(
-                    'Notifications',
+                    'Job Notifications',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 20,
@@ -1307,6 +1235,12 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     ),
                   ),
                   const Spacer(),
+                  // Add test notification button
+                  IconButton(
+                    onPressed: () => _testNotifications(),
+                    icon: const Icon(Icons.bug_report, color: Colors.white),
+                    tooltip: 'Test Notifications',
+                  ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close, color: Colors.white),
@@ -1324,21 +1258,35 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   
                   final notifications = snapshot.data ?? [];
                   
+                  debugPrint('🔔 Notifications panel: Found ${notifications.length} notifications');
+                  for (var notif in notifications) {
+                    debugPrint('🔔 Notification: ${notif['title']} - ${notif['body']}');
+                  }
+                  
                   if (notifications.isEmpty) {
-                    return const Center(
+                    return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.notifications_off, size: 64, color: Colors.grey),
-                          SizedBox(height: 16),
-                          Text(
-                            'No notifications yet',
+                          const Icon(Icons.notifications_off, size: 64, color: Colors.grey),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No job alerts yet',
                             style: TextStyle(fontSize: 16, color: Colors.grey),
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            'You\'ll receive notifications for new jobs',
+                          const SizedBox(height: 8),
+                          const Text(
+                            'You\'ll receive alerts when new jobs are available',
                             style: TextStyle(fontSize: 14, color: Colors.grey),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: () => _testNotifications(),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                            ),
+                            child: const Text('Test Notifications'),
                           ),
                         ],
                       ),
@@ -1350,15 +1298,40 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     itemCount: notifications.length,
                     itemBuilder: (context, index) {
                       final notification = notifications[index];
+                      final isJobAlert = notification['type'] == 'new_booking' || notification['type'] == 'job_alert';
+                      
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
+                        elevation: 3,
                         child: ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: AppColors.primary,
-                            child: Icon(Icons.work, color: Colors.white),
+                          leading: CircleAvatar(
+                            backgroundColor: isJobAlert ? Colors.green : AppColors.primary,
+                            child: Icon(
+                              isJobAlert ? Icons.work : Icons.notifications,
+                              color: Colors.white,
+                            ),
                           ),
-                          title: Text(notification['title'] ?? 'New Job'),
-                          subtitle: Text(notification['body'] ?? 'Job notification'),
+                          title: Text(
+                            notification['title'] ?? 'Job Alert',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(notification['body'] ?? 'New job available'),
+                              if (isJobAlert && notification['service'] != null) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Service: ${notification['service']} • Amount: ₹${notification['amount'] ?? 'N/A'}',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.green,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                           trailing: Text(
                             _formatNotificationTime(notification['timestamp']),
                             style: const TextStyle(fontSize: 12, color: Colors.grey),
@@ -1372,42 +1345,64 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
             ),
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _testNotifications(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('Test Notification'),
-                    ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    await FCMService().clearPendingNotifications();
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Notifications cleared')),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        await FCMService().clearPendingNotifications();
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Notifications cleared')),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('Clear All'),
-                    ),
-                  ),
-                ],
+                  child: const Text('Clear All Notifications'),
+                ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Test notifications functionality
+  Future<void> _testNotifications() async {
+    try {
+      debugPrint('🧪 Testing notifications...');
+      
+      // Show loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sending test notifications...'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      // Test complete notification flow
+      await FCMService.testCompleteNotificationFlow();
+      
+      // Show success
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Test notifications sent! Check notification panel.'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Test failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   String _formatNotificationTime(dynamic timestamp) {
@@ -1423,145 +1418,6 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       return '${diff.inDays}d ago';
     } catch (e) {
       return 'Now';
-    }
-  }
-
-  Future<void> _testNotifications() async {
-    try {
-      debugPrint('🧪 Testing notifications...');
-      
-      // Test FCM service
-      await FCMService.testNotification();
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🧪 Test notification sent! Check your notification panel.'),
-            backgroundColor: Colors.blue,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('❌ Test notification error: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Test failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _rejectBooking(String bookingId, String technicianId) async {
-    try {
-      debugPrint('🔴 Technician rejecting booking: $bookingId');
-      
-      // Store context reference
-      final context = this.context;
-      
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
-      
-      // Reject the booking
-      await FirebaseService.rejectBooking(bookingId, technicianId);
-      
-      // Close loading
-      if (mounted) Navigator.of(context).pop();
-      
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('❌ Booking rejected'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-      
-      debugPrint('✅ Booking rejected successfully');
-    } catch (e) {
-      // Close loading
-      if (mounted) Navigator.of(context).pop();
-      
-      // Show error
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Failed to reject booking: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      
-      debugPrint('❌ Error rejecting booking: $e');
-    }
-  }
-
-  /// Force technician online status
-  Future<void> _forceOnlineStatus(TechnicianModel technician) async {
-    try {
-      debugPrint('🔥 FORCING TECHNICIAN ONLINE');
-      debugPrint('🔥 Current status: ${technician.isOnline}');
-      
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Text('Going ONLINE...'),
-            ],
-          ),
-        ),
-      );
-      
-      // Force update to ONLINE in Firebase
-      await FirebaseService.updateTechnicianStatus(technician.uid, true);
-      
-      // Also update the auth provider
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.refreshTechnicianData();
-      
-      // Close loading
-      if (mounted) Navigator.of(context).pop();
-      
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🔥 FORCED ONLINE! You should now receive jobs!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
-          ),
-        );
-      }
-      
-      debugPrint('✅ Technician forced ONLINE successfully');
-    } catch (e) {
-      // Close loading
-      if (mounted) Navigator.of(context).pop();
-      
-      // Show error
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Failed to go online: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      
-      debugPrint('❌ Error forcing online: $e');
     }
   }
 

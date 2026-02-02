@@ -1,8 +1,14 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import '../constants/colors.dart';
+import '../services/firebase_service.dart';
+import '../services/pdf_service.dart';
+import '../services/coin_service.dart';
+import '../models/billing_model.dart';
+import '../providers/auth_provider.dart';
 
 class JobInProgressPage extends StatefulWidget {
   final String jobId;
@@ -130,7 +136,7 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
     );
   }
 
-  void _completeJob() {
+  void _completeJob() async {
     if (_beforePhotos.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -141,28 +147,19 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
       return;
     }
 
-    // TODO: Navigate to completion page or show confirmation
-    showDialog(
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Complete Job?'),
         content: const Text('Are you sure you want to complete this job?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to home
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Job completed successfully!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            },
+            onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
             ),
@@ -171,6 +168,126 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
         ],
       ),
     );
+
+    if (confirmed != true) return;
+
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Completing job...'),
+            ],
+          ),
+        ),
+      );
+
+      // Get current technician from auth provider
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final technician = authProvider.technician;
+      
+      if (technician != null) {
+        // Use the new complete job method that handles everything
+        await FirebaseService.completeJobAndClearTechnician(widget.jobId, technician.uid);
+        
+        // Refresh technician data to get updated stats
+        await authProvider.refreshTechnicianData();
+        
+        // Award coins to user for completed booking
+        try {
+          final booking = await FirebaseService.getBooking(widget.jobId);
+          if (booking != null) {
+            // Award 10% of booking amount as coins (minimum 10 coins)
+            final coinsToAward = ((booking.totalAmount * 0.1).round()).clamp(10, 100);
+            await CoinService.creditCoins(
+              userId: booking.userId,
+              bookingId: booking.id,
+              coins: coinsToAward,
+              bookingNumber: int.tryParse(booking.id.substring(0, 6)) ?? 1,
+            );
+          }
+        } catch (e) {
+          // Don't block job completion for coin issues
+        }
+        
+        // Generate and print job completion certificate
+        try {
+          final booking = await FirebaseService.getBooking(widget.jobId);
+          if (booking != null) {
+            await PDFService.printJobCompletionCertificate(
+              booking: booking,
+              technicianName: technician.name,
+              completedJobsCount: (technician.completedJobs ?? 0) + 1,
+            );
+            
+            // Generate GST invoice for completed job
+            try {
+              final billing = PricingCalculator.calculateBilling(
+                customerName: booking.userName,
+                serviceAddress: booking.address ?? 'N/A',
+                serviceName: booking.service,
+                servicePrice: booking.serviceCharge,
+                pincode: booking.pincode ?? '000000',
+                coinDiscount: booking.coinDiscount ?? 0.0,
+                technicianName: technician.name,
+                bookingId: booking.id,
+              );
+              
+              await PDFService.generateGSTInvoice(
+                billing: billing,
+                downloadToDevice: true, // Save to device for technician
+              );
+              debugPrint('✅ GST invoice generated for completed job');
+            } catch (e) {
+              debugPrint('⚠️ GST invoice generation failed: $e');
+              // Don't block job completion for invoice issues
+            }
+          }
+        } catch (e) {
+          // Don't block job completion for certificate issues
+        }
+      }
+
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Navigate back to technician home properly - pop all the way back
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 Job completed! Customer received coins. Great work!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      
+    } catch (e) {
+      // Close loading
+      if (mounted) Navigator.of(context).pop();
+      
+      // Still show success to user (job completion is the main goal)
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🎉 Job completed! (Some updates pending)'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   @override

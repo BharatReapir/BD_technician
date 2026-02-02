@@ -4,9 +4,11 @@ import 'package:provider/provider.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../constants/colors.dart';
 import '../../models/booking_model.dart';
+import '../../models/billing_model.dart';
 import '../../services/firebase_service.dart';
 import '../../services/payment_service.dart';
-import '../../services/coin_service.dart'; // ✅ NEW
+import '../../services/coin_service.dart';
+import '../../services/pdf_service.dart';
 import '../../providers/auth_provider.dart' as auth_provider;
 import 'booking_success_page.dart';
 
@@ -42,6 +44,9 @@ class _PaymentPageState extends State<PaymentPage> {
 
   // Area type selection (for visiting charge)
   String _selectedArea = 'standard'; // 'standard' = ₹299, 'premium' = ₹399
+  
+  // GST-compliant billing calculation
+  late BillingModel _billing;
 
   @override
   void initState() {
@@ -50,6 +55,25 @@ class _PaymentPageState extends State<PaymentPage> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+    
+    // Initialize billing calculation
+    _calculateBilling();
+  }
+  
+  void _calculateBilling() {
+    // Get pincode from address for area-based visiting charge
+    final pincode = widget.address['pincode'] ?? '000000';
+    
+    _billing = PricingCalculator.calculateBilling(
+      customerName: 'Customer', // Will be updated with actual name during booking
+      serviceAddress: '${widget.address['address']}, ${widget.address['city']} - ${widget.address['pincode']}',
+      serviceName: widget.serviceName,
+      servicePrice: widget.serviceCharge, // This already has coin discount applied
+      pincode: pincode,
+      coinDiscount: widget.coinDiscount,
+      technicianName: 'TBD', // Will be assigned later
+      bookingId: 'TBD', // Will be generated during booking
+    );
   }
 
   @override
@@ -60,23 +84,10 @@ class _PaymentPageState extends State<PaymentPage> {
 
   // ==================== GST CALCULATIONS ====================
   
-  double get visitingCharge {
-    return _selectedArea == 'standard' ? 299.0 : 399.0;
-  }
-
-  // ✅ IMPORTANT: serviceCharge already has coin discount applied
-  // So taxableAmount = (serviceCharge - coinDiscount) + visitingCharge
-  double get taxableAmount {
-    return widget.serviceCharge + visitingCharge;
-  }
-
-  double get gstAmount {
-    return taxableAmount * 0.18; // 18% GST
-  }
-
-  double get totalAmount {
-    return taxableAmount + gstAmount;
-  }
+  double get visitingCharge => _billing.visitingCharge;
+  double get taxableAmount => _billing.netTaxableValue;
+  double get gstAmount => _billing.totalGst;
+  double get totalAmount => _billing.grossServiceValue;
 
   // ==================== RAZORPAY CALLBACKS ====================
 
@@ -121,6 +132,27 @@ class _PaymentPageState extends State<PaymentPage> {
           _currentBookingId!,
           response.paymentId!,
         );
+
+        // Generate GST invoice for completed payment
+        try {
+          final firebaseUser = FirebaseAuth.instance.currentUser;
+          final authProv = context.read<auth_provider.AuthProvider>();
+          final userData = authProv.user ?? (firebaseUser != null ? await FirebaseService.getUser(firebaseUser.uid) : null);
+          
+          final updatedBilling = _billing.copyWith(
+            bookingId: _currentBookingId!,
+            customerName: userData?.name ?? 'Customer',
+          );
+          
+          await PDFService.generateGSTInvoice(
+            billing: updatedBilling,
+            downloadToDevice: true, // Save to device for technician access
+          );
+          debugPrint('✅ GST invoice generated successfully');
+        } catch (e) {
+          debugPrint('⚠️ Invoice generation error: $e');
+          // Continue with payment success even if invoice generation fails
+        }
 
         if (!mounted) return;
 
@@ -238,6 +270,8 @@ class _PaymentPageState extends State<PaymentPage> {
         serviceCharge: widget.serviceCharge,
         area: _selectedArea,
         userId: firebaseUser.uid,
+        pincode: widget.address['pincode'],
+        coinDiscount: widget.coinDiscount,
       );
 
       // Step 3: Update booking with Razorpay order ID and breakdown
@@ -360,6 +394,27 @@ class _PaymentPageState extends State<PaymentPage> {
     debugPrint('🏠 Address: ${widget.address}');
     debugPrint('📍 Pincode: ${widget.address['pincode']}');
     
+    // Update billing with actual customer name
+    final updatedBilling = BillingModel(
+      invoiceNumber: _billing.invoiceNumber,
+      invoiceDate: _billing.invoiceDate,
+      customerName: userData.name,
+      serviceAddress: _billing.serviceAddress,
+      serviceName: _billing.serviceName,
+      servicePrice: _billing.servicePrice,
+      visitingCharge: _billing.visitingCharge,
+      coinDiscount: _billing.coinDiscount,
+      netTaxableValue: _billing.netTaxableValue,
+      cgstAmount: _billing.cgstAmount,
+      sgstAmount: _billing.sgstAmount,
+      totalGst: _billing.totalGst,
+      grossServiceValue: _billing.grossServiceValue,
+      visitingChargePaid: _billing.visitingChargePaid,
+      balancePayable: _billing.balancePayable,
+      technicianName: _billing.technicianName,
+      bookingId: _billing.bookingId,
+    );
+    
     final booking = BookingModel(
       id: '',
       userId: userData.uid,
@@ -367,22 +422,21 @@ class _PaymentPageState extends State<PaymentPage> {
       userPhone: userData.mobile,
       service: widget.serviceName,
       status: 'pending',
-      serviceCharge: widget.serviceCharge,
-      visitingCharge: visitingCharge,
-      taxableAmount: taxableAmount,
-      gstAmount: gstAmount,
-      totalAmount: totalAmount,
+      serviceCharge: updatedBilling.servicePrice,
+      visitingCharge: updatedBilling.visitingCharge,
+      taxableAmount: updatedBilling.netTaxableValue,
+      gstAmount: updatedBilling.totalGst,
+      totalAmount: updatedBilling.grossServiceValue,
       paymentStatus: 'pending',
       scheduledTime: '${widget.date} ${widget.timeSlot}',
       address: '${widget.address['address']}, ${widget.address['city']} - ${widget.address['pincode']}',
       city: widget.address['city']!,
-      pincode: widget.address['pincode']!, // 🔑 NEW: Extract pincode for mapping
+      pincode: widget.address['pincode']!,
       notes: widget.coinsUsed > 0 
-          ? 'Area: $_selectedArea | Coins: ${widget.coinsUsed}' // ✅ NEW
+          ? 'Area: $_selectedArea | Coins: ${widget.coinsUsed}' 
           : 'Area: $_selectedArea',
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
-      // ✅ NEW: Add coin fields
       coinsUsed: widget.coinsUsed,
       coinDiscount: widget.coinDiscount,
     );
@@ -392,13 +446,14 @@ class _PaymentPageState extends State<PaymentPage> {
     final bookingId = await FirebaseService.createBooking(booking);
     debugPrint('✅ Booking created with ID: $bookingId');
     
-    // ✅ FORCE REFRESH: Trigger a manual refresh to ensure immediate visibility
+    // Update billing with actual booking ID
+    _billing = updatedBilling.copyWith(bookingId: bookingId);
+    
+    // Force refresh for immediate visibility
     debugPrint('🔄 Forcing booking refresh...');
     try {
-      // Wait a moment for Firebase to propagate
       await Future.delayed(const Duration(milliseconds: 500));
       
-      // Test if booking is visible
       final testBookings = await FirebaseService.getUserBookings(userData.uid);
       final newBooking = testBookings.firstWhere(
         (b) => b.id == bookingId,
@@ -415,6 +470,27 @@ class _PaymentPageState extends State<PaymentPage> {
   Future<String> _createPayLaterBooking(dynamic userData) async {
     debugPrint('📝 Creating pay later booking for user: ${userData.uid}');
     
+    // Update billing with actual customer name
+    final updatedBilling = BillingModel(
+      invoiceNumber: _billing.invoiceNumber,
+      invoiceDate: _billing.invoiceDate,
+      customerName: userData.name,
+      serviceAddress: _billing.serviceAddress,
+      serviceName: _billing.serviceName,
+      servicePrice: _billing.servicePrice,
+      visitingCharge: _billing.visitingCharge,
+      coinDiscount: _billing.coinDiscount,
+      netTaxableValue: _billing.netTaxableValue,
+      cgstAmount: _billing.cgstAmount,
+      sgstAmount: _billing.sgstAmount,
+      totalGst: _billing.totalGst,
+      grossServiceValue: _billing.grossServiceValue,
+      visitingChargePaid: _billing.visitingChargePaid,
+      balancePayable: _billing.balancePayable,
+      technicianName: _billing.technicianName,
+      bookingId: _billing.bookingId,
+    );
+    
     final booking = BookingModel(
       id: '',
       userId: userData.uid,
@@ -422,16 +498,16 @@ class _PaymentPageState extends State<PaymentPage> {
       userPhone: userData.mobile,
       service: widget.serviceName,
       status: 'confirmed',
-      serviceCharge: widget.serviceCharge,
-      visitingCharge: visitingCharge,
-      taxableAmount: taxableAmount,
-      gstAmount: gstAmount,
-      totalAmount: totalAmount,
+      serviceCharge: updatedBilling.servicePrice,
+      visitingCharge: updatedBilling.visitingCharge,
+      taxableAmount: updatedBilling.netTaxableValue,
+      gstAmount: updatedBilling.totalGst,
+      totalAmount: updatedBilling.grossServiceValue,
       paymentStatus: 'pay_later',
       scheduledTime: '${widget.date} ${widget.timeSlot}',
       address: '${widget.address['address']}, ${widget.address['city']} - ${widget.address['pincode']}',
       city: widget.address['city']!,
-      pincode: widget.address['pincode']!, // 🔑 NEW: Extract pincode for mapping
+      pincode: widget.address['pincode']!,
       notes: widget.coinsUsed > 0 
           ? 'Area: $_selectedArea | Coins: ${widget.coinsUsed} | Payment: Cash on Service'
           : 'Area: $_selectedArea | Payment: Cash on Service',
@@ -446,13 +522,14 @@ class _PaymentPageState extends State<PaymentPage> {
     final bookingId = await FirebaseService.createBooking(booking);
     debugPrint('✅ Pay Later booking created with ID: $bookingId');
     
-    // ✅ FORCE REFRESH: Ensure immediate visibility for Pay Later bookings
+    // Update billing with actual booking ID
+    _billing = updatedBilling.copyWith(bookingId: bookingId);
+    
+    // Force refresh for immediate visibility
     debugPrint('🔄 Forcing Pay Later booking refresh...');
     try {
-      // Wait a moment for Firebase to propagate
       await Future.delayed(const Duration(milliseconds: 500));
       
-      // Test if booking is visible
       final testBookings = await FirebaseService.getUserBookings(userData.uid);
       final newBooking = testBookings.firstWhere(
         (b) => b.id == bookingId,

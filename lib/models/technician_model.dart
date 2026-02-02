@@ -43,6 +43,7 @@ class TechnicianModel {
   final List<String> specializations;
   final bool isOnline;
   final int totalJobs;
+  final int? completedJobs; // ✅ NEW: Completed jobs count
   final double rating;
   final double walletBalance;
   final String? profileImage;
@@ -60,6 +61,7 @@ class TechnicianModel {
     required this.specializations,
     this.isOnline = false,
     this.totalJobs = 0,
+    this.completedJobs, // ✅ NEW: Completed jobs count
     this.rating = 0.0,
     this.walletBalance = 0.0,
     this.profileImage,
@@ -79,6 +81,7 @@ class TechnicianModel {
       'specializations': specializations,
       'isOnline': isOnline,
       'totalJobs': totalJobs,
+      'completedJobs': completedJobs, // ✅ NEW
       'rating': rating,
       'walletBalance': walletBalance,
       'profileImage': profileImage,
@@ -99,6 +102,7 @@ class TechnicianModel {
       specializations: List<String>.from(json['specializations'] ?? []),
       isOnline: json['isOnline'] == true || json['isOnline'] == 'true',
       totalJobs: _toInt(json['totalJobs']),
+      completedJobs: json['completedJobs'] != null ? _toInt(json['completedJobs']) : null, // ✅ NEW
       rating: _toDouble(json['rating']),
       walletBalance: _toDouble(json['walletBalance']),
       profileImage: json['profileImage']?.toString(),
@@ -120,6 +124,7 @@ class TechnicianModel {
     List<String>? specializations,
     bool? isOnline,
     int? totalJobs,
+    int? completedJobs, // ✅ NEW
     double? rating,
     double? walletBalance,
     String? profileImage,
@@ -137,6 +142,7 @@ class TechnicianModel {
       specializations: specializations ?? this.specializations,
       isOnline: isOnline ?? this.isOnline,
       totalJobs: totalJobs ?? this.totalJobs,
+      completedJobs: completedJobs ?? this.completedJobs, // ✅ NEW
       rating: rating ?? this.rating,
       walletBalance: walletBalance ?? this.walletBalance,
       profileImage: profileImage ?? this.profileImage,

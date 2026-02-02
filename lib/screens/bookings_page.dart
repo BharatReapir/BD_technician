@@ -4,6 +4,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:provider/provider.dart';
 import '../constants/colors.dart';
 import '../models/booking_model.dart';
+import '../models/billing_model.dart';
 import '../services/firebase_service.dart';
 import '../services/pdf_service.dart'; // 📄 NEW: PDF service
 import '../providers/auth_provider.dart' as auth_provider;
@@ -219,11 +220,6 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
           body: StreamBuilder<List<BookingModel>>(
             stream: FirebaseService.streamUserBookings(currentUser.uid),
             builder: (context, snapshot) {
-              debugPrint('📱 Bookings stream state: ${snapshot.connectionState}');
-              debugPrint('📱 Has data: ${snapshot.hasData}');
-              debugPrint('📱 Data length: ${snapshot.data?.length ?? 0}');
-              debugPrint('📱 Error: ${snapshot.error}');
-              
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
                   child: CircularProgressIndicator(color: AppColors.primary),
@@ -231,8 +227,6 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
               }
               
               if (snapshot.hasError) {
-                debugPrint('❌ Stream error: ${snapshot.error}');
-                
                 // Check if it's a permission error
                 final errorStr = snapshot.error.toString().toLowerCase();
                 final isPermissionError = errorStr.contains('permission') || 
@@ -773,7 +767,6 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
 
   Future<void> _cancelBooking(BookingModel booking) async {
     try {
-      debugPrint('❌ Cancelling booking: ${booking.id}');
       await FirebaseService.updateBookingStatus(booking.id, 'cancelled');
       
       ScaffoldMessenger.of(context).showSnackBar(
@@ -786,7 +779,6 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
       // Reload bookings by triggering stream refresh
       setState(() {});
     } catch (e) {
-      debugPrint('❌ Error cancelling booking: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to cancel booking: $e'),
@@ -986,7 +978,22 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
         ),
       );
       
-      await PDFService.shareInvoicePDF(booking);
+      // Generate GST-compliant invoice
+      final billing = PricingCalculator.calculateBilling(
+        customerName: booking.userName,
+        serviceAddress: booking.address ?? 'N/A',
+        serviceName: booking.service,
+        servicePrice: booking.serviceCharge,
+        pincode: booking.pincode ?? '000000',
+        coinDiscount: booking.coinDiscount ?? 0.0,
+        technicianName: booking.technicianName ?? 'TBD',
+        bookingId: booking.id,
+      );
+      
+      await PDFService.generateGSTInvoice(
+        billing: billing,
+        downloadToDevice: false, // Share instead of download
+      );
       
       // Close loading
       if (mounted) Navigator.of(context).pop();
@@ -1036,7 +1043,22 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
         ),
       );
       
-      await PDFService.shareInvoicePDF(booking);
+      // Generate GST-compliant invoice
+      final billing = PricingCalculator.calculateBilling(
+        customerName: booking.userName,
+        serviceAddress: booking.address ?? 'N/A',
+        serviceName: booking.service,
+        servicePrice: booking.serviceCharge,
+        pincode: booking.pincode ?? '000000',
+        coinDiscount: booking.coinDiscount ?? 0.0,
+        technicianName: booking.technicianName ?? 'TBD',
+        bookingId: booking.id,
+      );
+      
+      await PDFService.generateGSTInvoice(
+        billing: billing,
+        downloadToDevice: false, // Share instead of download
+      );
       
       // Close loading
       if (mounted) Navigator.of(context).pop();

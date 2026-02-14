@@ -1157,39 +1157,102 @@ class FirebaseService {
 
   // ==================== DYNAMIC SERVICES & PRICING ====================
 
-  /// Get all active services from Firebase
+  /// Get all active services from Firebase (checks both services/ and pricing/ nodes)
   static Future<List<dynamic>> getActiveServices() async {
     try {
       debugPrint('🔍 Fetching active services from Firebase...');
-      final snapshot = await _realtimeDb.ref('services').get();
       
-      if (!snapshot.exists) {
-        debugPrint('⚠️ No services found in Firebase');
-        return [];
+      List<Map<String, dynamic>> allServices = [];
+      
+      // Try services/ node first
+      final servicesSnapshot = await _realtimeDb.ref('services').get();
+      if (servicesSnapshot.exists) {
+        final Map<dynamic, dynamic> servicesMap = servicesSnapshot.value as Map<dynamic, dynamic>;
+        servicesMap.forEach((key, value) {
+          final serviceData = Map<String, dynamic>.from(value as Map);
+          serviceData['id'] = key;
+          
+          // Only include active services
+          if (serviceData['status'] == 'active') {
+            allServices.add(serviceData);
+          }
+        });
+        debugPrint('✅ Found ${allServices.length} services in services/ node');
+      }
+      
+      // Also check pricing/ node for additional services
+      final pricingSnapshot = await _realtimeDb.ref('pricing').get();
+      if (pricingSnapshot.exists) {
+        final Map<dynamic, dynamic> pricingMap = pricingSnapshot.value as Map<dynamic, dynamic>;
+        
+        // Extract unique service types from pricing
+        Set<String> uniqueServiceTypes = {};
+        pricingMap.forEach((key, value) {
+          final pricingData = Map<String, dynamic>.from(value as Map);
+          final serviceType = pricingData['serviceType'] ?? pricingData['acType'] ?? '';
+          if (serviceType.isNotEmpty) {
+            uniqueServiceTypes.add(serviceType);
+          }
+        });
+        
+        // Add unique service types as services
+        for (var serviceType in uniqueServiceTypes) {
+          // Check if this service type already exists
+          final exists = allServices.any((s) => 
+            s['name'].toString().toLowerCase() == serviceType.toLowerCase()
+          );
+          
+          if (!exists) {
+            allServices.add({
+              'id': serviceType.toLowerCase().replaceAll(' ', '-'),
+              'name': serviceType,
+              'icon': _getIconForServiceType(serviceType),
+              'bgColor': _getColorForServiceType(serviceType),
+              'type': serviceType.toLowerCase().replaceAll(' ', '_'),
+              'status': 'active',
+              'order': allServices.length + 100,
+            });
+            debugPrint('✅ Added service from pricing: $serviceType');
+          }
+        }
       }
 
-      final Map<dynamic, dynamic> servicesMap = snapshot.value as Map<dynamic, dynamic>;
-      final List<Map<String, dynamic>> services = [];
-
-      servicesMap.forEach((key, value) {
-        final serviceData = Map<String, dynamic>.from(value as Map);
-        serviceData['id'] = key;
-        
-        // Only include active services
-        if (serviceData['status'] == 'active') {
-          services.add(serviceData);
-        }
-      });
-
       // Sort by order
-      services.sort((a, b) => (a['order'] ?? 0).compareTo(b['order'] ?? 0));
+      allServices.sort((a, b) => (a['order'] ?? 0).compareTo(b['order'] ?? 0));
       
-      debugPrint('✅ Fetched ${services.length} active services');
-      return services;
+      debugPrint('✅ Total active services: ${allServices.length}');
+      return allServices;
     } catch (e) {
       debugPrint('❌ Error fetching services: $e');
       return [];
     }
+  }
+
+  /// Get icon for service type
+  static String _getIconForServiceType(String serviceType) {
+    final type = serviceType.toLowerCase();
+    if (type.contains('cctv')) return 'videocam';
+    if (type.contains('plumb')) return 'plumbing';
+    if (type.contains('tv')) return 'tv';
+    if (type.contains('electric')) return 'bolt';
+    if (type.contains('paint')) return 'format_paint';
+    if (type.contains('carpen')) return 'carpenter';
+    if (type.contains('clean')) return 'cleaning_services';
+    if (type.contains('ac') || type.contains('air')) return 'ac_unit';
+    return 'build';
+  }
+
+  /// Get color for service type
+  static String _getColorForServiceType(String serviceType) {
+    final type = serviceType.toLowerCase();
+    if (type.contains('cctv')) return '#FFE0B2';
+    if (type.contains('plumb')) return '#E1F5FE';
+    if (type.contains('tv')) return '#F3E5F5';
+    if (type.contains('electric')) return '#FFF9C4';
+    if (type.contains('paint')) return '#F1F8E9';
+    if (type.contains('carpen')) return '#FFF3E0';
+    if (type.contains('clean')) return '#E0F2F1';
+    return '#E0F7F4';
   }
 
   /// Get pricing for a specific service

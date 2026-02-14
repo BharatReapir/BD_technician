@@ -168,28 +168,54 @@ class _HomeContentState extends State<HomeContent> {
     try {
       setState(() => _isLoading = true);
       
-      final services = await FirebaseService.getActiveServices();
+      // Start with hardcoded services
+      List<Map<String, dynamic>> allServices = List.from(_fallbackServices);
+      debugPrint('🔵 Starting with ${allServices.length} hardcoded services');
       
-      if (services.isNotEmpty) {
-        // Convert Firebase services to the format expected by UI
-        final convertedServices = services.map((service) {
-          return {
-            'name': service['name'] ?? '',
-            'icon': _getIconFromString(service['icon'] ?? 'build'),
-            'bgColor': _getColorFromHex(service['bgColor'] ?? '#E0F7F4'),
-            'type': service['type'] ?? 'coming_soon',
-          };
-        }).toList();
+      // Get list of hardcoded service names for comparison
+      final hardcodedNames = _fallbackServices
+          .map((s) => s['name'].toString().toLowerCase())
+          .toSet();
+      
+      // Fetch Firebase services
+      debugPrint('🔵 Attempting to fetch from Firebase...');
+      final firebaseServices = await FirebaseService.getActiveServices();
+      debugPrint('🔵 Firebase returned ${firebaseServices.length} services');
+      
+      if (firebaseServices.isNotEmpty) {
+        debugPrint('✅ Fetched ${firebaseServices.length} services from Firebase');
         
-        setState(() {
-          _allServices = convertedServices;
-          _isLoading = false;
-        });
-        debugPrint('✅ Loaded ${_allServices.length} services from Firebase');
+        // Add Firebase services that are NOT in hardcoded list
+        int addedCount = 0;
+        for (var fbService in firebaseServices) {
+          final serviceName = fbService['name'] ?? '';
+          debugPrint('🔍 Checking Firebase service: $serviceName');
+          
+          // Check if this service name is in hardcoded list
+          if (!hardcodedNames.contains(serviceName.toLowerCase())) {
+            // New service from Firebase - add it
+            allServices.add({
+              'name': serviceName,
+              'icon': _getIconFromString(fbService['icon'] ?? 'build'),
+              'bgColor': _getColorFromHex(fbService['bgColor'] ?? '#E0F7F4'),
+              'type': fbService['type'] ?? 'coming_soon',
+            });
+            addedCount++;
+            debugPrint('➕ Added new service from Firebase: $serviceName');
+          } else {
+            debugPrint('⏭️ Skipped duplicate: $serviceName (already in hardcoded list)');
+          }
+        }
+        debugPrint('📊 Added $addedCount new services from Firebase');
       } else {
-        // Use fallback services
-        _loadFallbackServices();
+        debugPrint('⚠️ No services from Firebase, using only hardcoded');
       }
+      
+      setState(() {
+        _allServices = allServices;
+        _isLoading = false;
+      });
+      debugPrint('✅ Total services loaded: ${_allServices.length} (${_fallbackServices.length} hardcoded + ${allServices.length - _fallbackServices.length} from Firebase)');
     } catch (e) {
       debugPrint('❌ Error loading services: $e');
       _loadFallbackServices();
@@ -224,6 +250,22 @@ class _HomeContentState extends State<HomeContent> {
         return Icons.bolt;
       case 'build':
         return Icons.build;
+      case 'videocam':
+      case 'cctv':
+        return Icons.videocam;
+      case 'plumbing':
+        return Icons.plumbing;
+      case 'electrical_services':
+        return Icons.electrical_services;
+      case 'carpenter':
+        return Icons.carpenter;
+      case 'format_paint':
+      case 'painting':
+        return Icons.format_paint;
+      case 'cleaning_services':
+        return Icons.cleaning_services;
+      case 'home_repair_service':
+        return Icons.home_repair_service;
       default:
         return Icons.build;
     }

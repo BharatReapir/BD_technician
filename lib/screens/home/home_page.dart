@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../constants/colors.dart';
 import '../../widgets/offer_card.dart';
 import '../../widgets/service_card.dart';
+import '../../services/firebase_service.dart';
 import '../bookings_page.dart';
 import '../wallet_page.dart';
 import '../support_page.dart';
@@ -96,8 +97,11 @@ class HomeContent extends StatefulWidget {
 class _HomeContentState extends State<HomeContent> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  List<Map<String, dynamic>> _allServices = [];
+  bool _isLoading = true;
 
-  final List<Map<String, dynamic>> _allServices = [
+  // Fallback services if Firebase fails
+  final List<Map<String, dynamic>> _fallbackServices = [
     {
       'name': 'AC Repair',
       'icon': Icons.ac_unit,
@@ -153,6 +157,85 @@ class _HomeContentState extends State<HomeContent> {
       'type': 'coming_soon',
     },
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadServices();
+  }
+
+  Future<void> _loadServices() async {
+    try {
+      setState(() => _isLoading = true);
+      
+      final services = await FirebaseService.getActiveServices();
+      
+      if (services.isNotEmpty) {
+        // Convert Firebase services to the format expected by UI
+        final convertedServices = services.map((service) {
+          return {
+            'name': service['name'] ?? '',
+            'icon': _getIconFromString(service['icon'] ?? 'build'),
+            'bgColor': _getColorFromHex(service['bgColor'] ?? '#E0F7F4'),
+            'type': service['type'] ?? 'coming_soon',
+          };
+        }).toList();
+        
+        setState(() {
+          _allServices = convertedServices;
+          _isLoading = false;
+        });
+        debugPrint('✅ Loaded ${_allServices.length} services from Firebase');
+      } else {
+        // Use fallback services
+        _loadFallbackServices();
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading services: $e');
+      _loadFallbackServices();
+    }
+  }
+
+  void _loadFallbackServices() {
+    setState(() {
+      _allServices = _fallbackServices;
+      _isLoading = false;
+    });
+    debugPrint('⚠️ Using fallback services');
+  }
+
+  IconData _getIconFromString(String iconName) {
+    switch (iconName) {
+      case 'ac_unit':
+        return Icons.ac_unit;
+      case 'kitchen':
+        return Icons.kitchen;
+      case 'local_laundry_service':
+        return Icons.local_laundry_service;
+      case 'water_drop':
+        return Icons.water_drop;
+      case 'microwave':
+        return Icons.microwave;
+      case 'kitchen_outlined':
+        return Icons.kitchen_outlined;
+      case 'tv':
+        return Icons.tv;
+      case 'bolt':
+        return Icons.bolt;
+      case 'build':
+        return Icons.build;
+      default:
+        return Icons.build;
+    }
+  }
+
+  Color _getColorFromHex(String hexColor) {
+    String hex = hexColor.replaceAll('#', '');
+    if (hex.length == 6) {
+      hex = 'FF$hex';
+    }
+    return Color(int.parse(hex, radix: 16));
+  }
 
   List<Map<String, dynamic>> get _filteredServices {
     if (_searchQuery.isEmpty) {
@@ -348,7 +431,6 @@ class _HomeContentState extends State<HomeContent> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Banner with Glass Buttons (16:9 ratio)
                   Padding(
                     padding: const EdgeInsets.all(16),
                     child: ClipRRect(
@@ -562,49 +644,58 @@ class _HomeContentState extends State<HomeContent> {
                   const SizedBox(height: 16),
 
                   // ✨ Smaller Services Grid
-                  _filteredServices.isEmpty
+                  _isLoading
                       ? const Padding(
                           padding: EdgeInsets.all(40.0),
                           child: Center(
-                            child: Text(
-                              'No services found',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: AppColors.textGray,
-                              ),
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                             ),
                           ),
                         )
-                      : Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                          child: GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3, // ✨ 3 columns instead of 2
-                              mainAxisSpacing: 12,
-                              crossAxisSpacing: 12,
-                              childAspectRatio: 0.85, // ✨ Smaller cards
+                      : _filteredServices.isEmpty
+                          ? const Padding(
+                              padding: EdgeInsets.all(40.0),
+                              child: Center(
+                                child: Text(
+                                  'No services found',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: AppColors.textGray,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                              child: GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate:
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3, // ✨ 3 columns instead of 2
+                                  mainAxisSpacing: 12,
+                                  crossAxisSpacing: 12,
+                                  childAspectRatio: 0.85, // ✨ Smaller cards
+                                ),
+                                itemCount: _filteredServices.length,
+                                itemBuilder: (context, index) {
+                                  final service = _filteredServices[index];
+                                  return GestureDetector(
+                                    onTap: () => _navigateToService(
+                                      service['name'],
+                                      service['type'],
+                                      service['icon'],
+                                    ),
+                                    child: ServiceCard(
+                                      icon: service['icon'],
+                                      title: service['name'],
+                                      bgColor: service['bgColor'],
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
-                            itemCount: _filteredServices.length,
-                            itemBuilder: (context, index) {
-                              final service = _filteredServices[index];
-                              return GestureDetector(
-                                onTap: () => _navigateToService(
-                                  service['name'],
-                                  service['type'],
-                                  service['icon'],
-                                ),
-                                child: ServiceCard(
-                                  icon: service['icon'],
-                                  title: service['name'],
-                                  bgColor: service['bgColor'],
-                                ),
-                              );
-                            },
-                          ),
-                        ),
                   const SizedBox(height: 20),
                 ],
               ),

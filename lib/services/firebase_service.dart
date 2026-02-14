@@ -1154,4 +1154,160 @@ class FirebaseService {
       return [];
     });
   }
+
+  // ==================== DYNAMIC SERVICES & PRICING ====================
+
+  /// Get all active services from Firebase
+  static Future<List<dynamic>> getActiveServices() async {
+    try {
+      debugPrint('🔍 Fetching active services from Firebase...');
+      final snapshot = await _realtimeDb.ref('services').get();
+      
+      if (!snapshot.exists) {
+        debugPrint('⚠️ No services found in Firebase');
+        return [];
+      }
+
+      final Map<dynamic, dynamic> servicesMap = snapshot.value as Map<dynamic, dynamic>;
+      final List<Map<String, dynamic>> services = [];
+
+      servicesMap.forEach((key, value) {
+        final serviceData = Map<String, dynamic>.from(value as Map);
+        serviceData['id'] = key;
+        
+        // Only include active services
+        if (serviceData['status'] == 'active') {
+          services.add(serviceData);
+        }
+      });
+
+      // Sort by order
+      services.sort((a, b) => (a['order'] ?? 0).compareTo(b['order'] ?? 0));
+      
+      debugPrint('✅ Fetched ${services.length} active services');
+      return services;
+    } catch (e) {
+      debugPrint('❌ Error fetching services: $e');
+      return [];
+    }
+  }
+
+  /// Get pricing for a specific service
+  static Future<Map<String, dynamic>?> getServicePricing(String serviceId) async {
+    try {
+      debugPrint('🔍 Fetching pricing for service: $serviceId');
+      final snapshot = await _realtimeDb.ref('pricing/$serviceId').get();
+      
+      if (!snapshot.exists) {
+        debugPrint('⚠️ No pricing found for service: $serviceId');
+        return null;
+      }
+
+      final pricingData = Map<String, dynamic>.from(snapshot.value as Map);
+      pricingData['serviceId'] = serviceId;
+      
+      debugPrint('✅ Fetched pricing for $serviceId');
+      return pricingData;
+    } catch (e) {
+      debugPrint('❌ Error fetching pricing: $e');
+      return null;
+    }
+  }
+
+  /// Get all pricing data
+  static Future<Map<String, Map<String, dynamic>>> getAllPricing() async {
+    try {
+      debugPrint('🔍 Fetching all pricing data...');
+      final snapshot = await _realtimeDb.ref('pricing').get();
+      
+      if (!snapshot.exists) {
+        debugPrint('⚠️ No pricing data found');
+        return {};
+      }
+
+      final Map<dynamic, dynamic> pricingMap = snapshot.value as Map<dynamic, dynamic>;
+      final Map<String, Map<String, dynamic>> pricing = {};
+
+      pricingMap.forEach((key, value) {
+        final pricingData = Map<String, dynamic>.from(value as Map);
+        pricingData['serviceId'] = key;
+        pricing[key] = pricingData;
+      });
+
+      debugPrint('✅ Fetched pricing for ${pricing.length} services');
+      return pricing;
+    } catch (e) {
+      debugPrint('❌ Error fetching all pricing: $e');
+      return {};
+    }
+  }
+
+  /// Listen to services changes in real-time
+  static Stream<List<Map<String, dynamic>>> servicesStream() {
+    return _realtimeDb.ref('services').onValue.map((event) {
+      if (!event.snapshot.exists) {
+        return <Map<String, dynamic>>[];
+      }
+
+      final Map<dynamic, dynamic> servicesMap = event.snapshot.value as Map<dynamic, dynamic>;
+      final List<Map<String, dynamic>> services = [];
+
+      servicesMap.forEach((key, value) {
+        final serviceData = Map<String, dynamic>.from(value as Map);
+        serviceData['id'] = key;
+        
+        // Only include active services
+        if (serviceData['status'] == 'active') {
+          services.add(serviceData);
+        }
+      });
+
+      // Sort by order
+      services.sort((a, b) => (a['order'] ?? 0).compareTo(b['order'] ?? 0));
+      
+      return services;
+    });
+  }
+
+  /// Listen to pricing changes in real-time
+  static Stream<Map<String, Map<String, dynamic>>> pricingStream() {
+    return _realtimeDb.ref('pricing').onValue.map((event) {
+      if (!event.snapshot.exists) {
+        return <String, Map<String, dynamic>>{};
+      }
+
+      final Map<dynamic, dynamic> pricingMap = event.snapshot.value as Map<dynamic, dynamic>;
+      final Map<String, Map<String, dynamic>> pricing = {};
+
+      pricingMap.forEach((key, value) {
+        final pricingData = Map<String, dynamic>.from(value as Map);
+        pricingData['serviceId'] = key;
+        pricing[key] = pricingData;
+      });
+
+      return pricing;
+    });
+  }
+
+  /// Get service by ID
+  static Future<Map<String, dynamic>?> getServiceById(String serviceId) async {
+    try {
+      debugPrint('🔍 Fetching service: $serviceId');
+      final snapshot = await _realtimeDb.ref('services/$serviceId').get();
+      
+      if (!snapshot.exists) {
+        debugPrint('⚠️ Service not found: $serviceId');
+        return null;
+      }
+
+      final serviceData = Map<String, dynamic>.from(snapshot.value as Map);
+      serviceData['id'] = serviceId;
+      
+      debugPrint('✅ Fetched service: $serviceId');
+      return serviceData;
+    } catch (e) {
+      debugPrint('❌ Error fetching service: $e');
+      return null;
+    }
+  }
 }

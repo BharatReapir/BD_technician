@@ -54,16 +54,12 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
     }
   }
 
-  /// NEW: Initialize both internet and Firebase connection checks
   Future<void> _initializeConnectionChecks() async {
-    // Check actual internet connectivity
     _checkInternetConnection();
     
-    // Check Firebase connection
     _checkFirebaseConnection();
   }
 
-  /// NEW: Check actual internet connectivity
   Future<void> _checkInternetConnection() async {
     try {
       // Listen to connectivity changes
@@ -214,7 +210,6 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
             return;
           }
           
-          // Use most recent booking if no exact match
           final sortedBookings = bookingsMap.entries.toList()
             ..sort((a, b) {
               final aTime = (a.value as Map)['acceptedAt'] ?? 0;

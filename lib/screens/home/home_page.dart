@@ -34,7 +34,9 @@ class _HomePageState extends State<HomePage> {
               ? const BookingsPage()
               : _selectedIndex == 2
                   ? const WalletPage()
-                  : const ProfilePage(),
+                  : _selectedIndex == 3
+                      ? const SupportPage()
+                      : const ProfilePage(),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
@@ -71,6 +73,11 @@ class _HomePageState extends State<HomePage> {
               icon: Icon(Icons.account_balance_wallet_outlined),
               activeIcon: Icon(Icons.account_balance_wallet),
               label: 'Wallet',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.headphones_outlined),
+              activeIcon: Icon(Icons.headphones),
+              label: 'Support',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

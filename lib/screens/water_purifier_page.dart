@@ -24,6 +24,25 @@ class WaterPurifierPage extends StatelessWidget {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Water Purifier Service Image
+          Container(
+            height: 200,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.bgMedium,
+            ),
+            child: Image.network(
+              'https://images.unsplash.com/photo-1582719471384-894fbb16e074?w=800',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: AppColors.bgMedium,
+                child: const Center(
+                  child: Icon(Icons.water_drop, size: 80, color: AppColors.primary),
+                ),
+              ),
+            ),
+          ),
+          
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(

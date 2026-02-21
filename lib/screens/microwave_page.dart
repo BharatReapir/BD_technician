@@ -24,6 +24,25 @@ class MicrowavePage extends StatelessWidget {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Microwave Service Image
+          Container(
+            height: 200,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.bgMedium,
+            ),
+            child: Image.network(
+              'https://images.unsplash.com/photo-1585659722983-3a675dabf23d?w=800',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: AppColors.bgMedium,
+                child: const Center(
+                  child: Icon(Icons.microwave, size: 80, color: AppColors.primary),
+                ),
+              ),
+            ),
+          ),
+          
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(

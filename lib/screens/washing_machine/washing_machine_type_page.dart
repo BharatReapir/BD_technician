@@ -28,7 +28,7 @@ class WashingMachineTypePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Color(0xFFE53935), // Red
+        backgroundColor: AppColors.primary,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -42,6 +42,25 @@ class WashingMachineTypePage extends StatelessWidget {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Washing Machine Service Image
+          Container(
+            height: 200,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.bgMedium,
+            ),
+            child: Image.network(
+              'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?w=800',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: AppColors.bgMedium,
+                child: const Center(
+                  child: Icon(Icons.local_laundry_service, size: 80, color: AppColors.primary),
+                ),
+              ),
+            ),
+          ),
+          
           const Padding(
             padding: EdgeInsets.all(20.0),
             child: Text(

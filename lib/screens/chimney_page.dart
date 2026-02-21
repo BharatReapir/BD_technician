@@ -25,6 +25,25 @@ class ChimneyPage extends StatelessWidget {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Chimney Service Image
+          Container(
+            height: 200,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.bgMedium,
+            ),
+            child: Image.network(
+              'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=800',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: AppColors.bgMedium,
+                child: const Center(
+                  child: Icon(Icons.kitchen_outlined, size: 80, color: AppColors.primary),
+                ),
+              ),
+            ),
+          ),
+          
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(

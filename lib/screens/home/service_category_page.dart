@@ -31,6 +31,25 @@ class ServiceCategoryPage extends StatelessWidget {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Common AC Service Image
+          Container(
+            height: 200,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.bgMedium,
+            ),
+            child: Image.network(
+              'https://images.unsplash.com/photo-1631545806609-4b0e36e4c824?w=800',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: AppColors.bgMedium,
+                child: Center(
+                  child: Icon(icon, size: 80, color: AppColors.primary),
+                ),
+              ),
+            ),
+          ),
+          
           const Padding(
             padding: EdgeInsets.all(16.0),
             child: Text(

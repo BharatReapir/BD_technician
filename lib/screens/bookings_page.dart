@@ -145,19 +145,41 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
 
     try {
       final coinProvider = context.read<CoinProvider>();
+      
+      // Get completed bookings sorted by date
+      final completedBookings = bookings
+          .where((b) => b.status == 'completed')
+          .toList()
+        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-      for (final booking in bookings) {
-        if (booking.status == 'completed') {
-          final coins = _calculateCoins(booking.totalAmount);
-
-          debugPrint('💰 Attempting to credit $coins coins for booking ${booking.id}');
-
-          await coinProvider.creditCoins(
-            bookingId: booking.id,
-            coins: coins,
-            bookingNumber: 1,
-          );
+      for (int i = 0; i < completedBookings.length; i++) {
+        final booking = completedBookings[i];
+        final bookingNumber = i + 1; // 1st, 2nd, 3rd, etc.
+        
+        // Calculate coins based on booking number
+        int coins;
+        if (bookingNumber <= 5) {
+          // Welcome coins for first 5 bookings
+          final welcomeCoinsMap = {
+            1: 1000, // ₹10
+            2: 1500, // ₹15
+            3: 2000, // ₹20
+            4: 2500, // ₹25
+            5: 3000, // ₹30
+          };
+          coins = welcomeCoinsMap[bookingNumber] ?? 0;
+        } else {
+          // Regular coins: 10% of booking amount
+          coins = _calculateCoins(booking.totalAmount);
         }
+
+        debugPrint('💰 Attempting to credit $coins coins for booking #$bookingNumber (${booking.id})');
+
+        await coinProvider.creditCoins(
+          bookingId: booking.id,
+          coins: coins,
+          bookingNumber: bookingNumber,
+        );
       }
     } catch (e) {
       debugPrint('❌ Error crediting coins: $e');

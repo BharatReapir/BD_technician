@@ -202,16 +202,40 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
         try {
           final booking = await FirebaseService.getBooking(widget.jobId);
           if (booking != null) {
-            // Award 10% of booking amount as coins (minimum 10 coins)
-            final coinsToAward = ((booking.totalAmount * 0.1).round()).clamp(10, 100);
-            await CoinService.creditCoins(
-              userId: booking.userId,
-              bookingId: booking.id,
-              coins: coinsToAward,
-              bookingNumber: int.tryParse(booking.id.substring(0, 6)) ?? 1,
-            );
+            // Get user's completed bookings count to determine welcome bonus
+            final userBookings = await FirebaseService.getUserBookings(booking.userId);
+            final completedCount = userBookings.where((b) => b.status == 'completed').length;
+            final bookingNumber = completedCount + 1; // This will be the Nth completed booking
+            
+            // Calculate coins based on booking number
+            int coinsToAward;
+            if (bookingNumber <= 5) {
+              // Welcome coins for first 5 bookings
+              final welcomeCoinsMap = {
+                1: 1000, // ₹10
+                2: 1500, // ₹15
+                3: 2000, // ₹20
+                4: 2500, // ₹25
+                5: 3000, // ₹30
+              };
+              coinsToAward = welcomeCoinsMap[bookingNumber] ?? 0;
+            } else {
+              // Regular coins: 10% of booking amount (minimum 10, maximum 100)
+              coinsToAward = ((booking.totalAmount * 0.1).round()).clamp(10, 100);
+            }
+            
+            if (coinsToAward > 0) {
+              await CoinService.creditCoins(
+                userId: booking.userId,
+                bookingId: booking.id,
+                coins: coinsToAward,
+                bookingNumber: bookingNumber,
+              );
+              debugPrint('✅ Credited $coinsToAward coins for booking #$bookingNumber');
+            }
           }
         } catch (e) {
+          debugPrint('❌ Error crediting coins: $e');
           // Don't block job completion for coin issues
         }
         

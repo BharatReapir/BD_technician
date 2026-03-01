@@ -1,4 +1,4 @@
-import 'package:bharatapp/constants/colors.dart';
+import 'constants/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -7,8 +7,8 @@ import 'firebase_options.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/coin_provider.dart';
-import 'screens/landing_page.dart';
-import 'screens/home/home_page.dart';
+import 'screens/technician_login_page.dart';
+import 'screens/technician_home_page.dart';
 import 'services/fcm_service.dart';
 
 // 🔔 Background message handler (must be top-level)
@@ -32,11 +32,11 @@ void main() async {
   // 🔔 Initialize FCM Service
   await FCMService.initialize();
 
-  runApp(const BharatDoorstepApp());
+  runApp(const BDRTechnicianApp());
 }
 
-class BharatDoorstepApp extends StatelessWidget {
-  const BharatDoorstepApp({Key? key}) : super(key: key);
+class BDRTechnicianApp extends StatelessWidget {
+  const BDRTechnicianApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +44,7 @@ class BharatDoorstepApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
 
-        /// CoinProvider depends on AuthProvider
+        /// CoinProvider depends on AuthProvider (for technician earnings)
         ChangeNotifierProxyProvider<AuthProvider, CoinProvider>(
           create: (_) => CoinProvider(''),
           update: (_, auth, previous) {
@@ -52,8 +52,6 @@ class BharatDoorstepApp extends StatelessWidget {
 
             if (auth.isTechnician && auth.technician != null) {
               userId = auth.technician!.uid;
-            } else if (auth.isUser && auth.user != null) {
-              userId = auth.user!.uid;
             }
 
             return CoinProvider(userId);
@@ -61,7 +59,7 @@ class BharatDoorstepApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'Bharat Doorstep',
+        title: 'BDR Technician',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           fontFamily: 'Roboto',
@@ -73,19 +71,20 @@ class BharatDoorstepApp extends StatelessWidget {
             elevation: 0,
           ),
         ),
-        home: const AuthChecker(),
+        home: const TechnicianAuthChecker(),
       ),
     );
   }
 }
-class AuthChecker extends StatefulWidget {
-  const AuthChecker({Key? key}) : super(key: key);
+
+class TechnicianAuthChecker extends StatefulWidget {
+  const TechnicianAuthChecker({Key? key}) : super(key: key);
 
   @override
-  State<AuthChecker> createState() => _AuthCheckerState();
+  State<TechnicianAuthChecker> createState() => _TechnicianAuthCheckerState();
 }
 
-class _AuthCheckerState extends State<AuthChecker> {
+class _TechnicianAuthCheckerState extends State<TechnicianAuthChecker> {
   late Future<void> _loadFuture;
 
   @override
@@ -107,11 +106,26 @@ class _AuthCheckerState extends State<AuthChecker> {
               );
             }
 
-            if (authProvider.isLoggedIn) {
-              return const HomePage();
+            // ✅ TECHNICIAN APP: Only allow technician login
+            if (authProvider.isLoggedIn && authProvider.isTechnician) {
+              return const TechnicianHomePage();
             }
 
-            return const LandingPage();
+            // Show error if user account tries to login
+            if (authProvider.isLoggedIn && authProvider.isUser) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('This account is not registered as a technician. Please use the Customer App.'),
+                    backgroundColor: Colors.red,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+                authProvider.logout();
+              });
+            }
+
+            return const TechnicianLoginPage();
           },
         );
       },

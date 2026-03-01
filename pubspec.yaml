@@ -1,5 +1,5 @@
-name: bharatapp
-description: "A new Flutter project."
+name: bdr_technician_app
+description: "BDR Technician - Partner/Employee Application"
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -52,6 +52,7 @@ dependencies:
   path_provider: ^2.1.1  # 📁 NEW: File system paths
   connectivity_plus: ^6.0.5  # 🌐 NEW: Network connectivity
   fluttertoast: ^8.2.8  # 🍞 NEW: Toast messages
+  signature: ^5.5.0  # ✍️ NEW: Signature capture
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.

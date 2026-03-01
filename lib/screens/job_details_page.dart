@@ -6,6 +6,7 @@ import '../constants/colors.dart';
 import '../models/booking_model.dart';
 import '../utils/commission_calculator.dart';
 import 'job_in_progress_page.dart';
+import 'complete_job_page.dart';
 
 class JobDetailsPage extends StatefulWidget {
   final String bookingId;
@@ -786,6 +787,146 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
 
             const Divider(height: 1, thickness: 1),
 
+            // ── Invoice / Bill Summary ────────────────────────────────
+            Container(
+              color: const Color(0xFFF8FAFF),
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.receipt_long,
+                          color: Color(0xFF2563EB), size: 20),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Invoice Breakdown',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInvoiceRow(
+                    'Service Charge',
+                    '₹${booking!.serviceCharge.toStringAsFixed(0)}',
+                  ),
+                  if (booking!.visitingCharge > 0) ...[
+                    const SizedBox(height: 8),
+                    _buildInvoiceRow(
+                      'Visiting Charge',
+                      '₹${booking!.visitingCharge.toStringAsFixed(0)}',
+                    ),
+                  ],
+                  if (booking!.gstAmount > 0) ...[
+                    const SizedBox(height: 8),
+                    _buildInvoiceRow(
+                      'GST (18%)',
+                      '₹${booking!.gstAmount.toStringAsFixed(2)}',
+                    ),
+                  ],
+                  if ((booking!.coinDiscount ?? 0) > 0) ...[
+                    const SizedBox(height: 8),
+                    _buildInvoiceRow(
+                      'Coin Discount',
+                      '-₹${booking!.coinDiscount!.toStringAsFixed(0)}',
+                      valueColor: Colors.green,
+                    ),
+                  ],
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Divider(thickness: 1),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Total Amount',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      Text(
+                        '₹${booking!.totalAmount.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2563EB),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // Technician Earnings summary
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: Colors.green.withOpacity(0.25)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.account_balance_wallet,
+                            color: Colors.green, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Your Earnings (after 20% commission)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                              Text(
+                                '₹${earnings.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text(
+                              'Platform fee',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.black38,
+                              ),
+                            ),
+                            Text(
+                              '-₹${commission.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.red,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Divider(height: 1, thickness: 1),
+
             // Additional Job Information Section (if available)
             if (booking!.notes != null && booking!.notes!.isNotEmpty)
               Container(
@@ -826,47 +967,191 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
 
             const SizedBox(height: 24),
 
-            // Start Job Button
+            // Bottom Action Button — fully status-aware
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => JobInProgressPage(
-                          jobId: widget.bookingId,
-                          customerName: booking!.userName,
-                          service: booking!.service,
-                          timeSlot: booking!.scheduledTime,
-                        ),
-                      ),
-                    );
-                  },
-                  child: const Text(
-                    'Start Job',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 2,
-                  ),
-                ),
-              ),
+              child: _buildStatusActionButton(),
             ),
 
             const SizedBox(height: 32),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInvoiceRow(String label, String value, {Color? valueColor}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 14,
+            color: Colors.black54,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: valueColor ?? Colors.black87,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Build the bottom action button based on booking status
+  Widget _buildStatusActionButton() {
+    final status = booking?.status ?? '';
+
+    if (status == 'completed') {
+      // ✅ Job Completed badge — non-tappable
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.green.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.green.shade300, width: 1.5),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 22),
+            SizedBox(width: 8),
+            Text(
+              '✅ Job Completed',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.green,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (status == 'in_progress') {
+      // Resume Job button
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => JobInProgressPage(
+                  jobId: widget.bookingId,
+                  customerName: booking!.userName,
+                  service: booking!.service,
+                  timeSlot: booking!.scheduledTime,
+                ),
+              ),
+            );
+          },
+          icon: const Icon(Icons.play_circle_fill, color: Colors.white),
+          label: const Text(
+            'Resume Job',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 2,
+          ),
+        ),
+      );
+    }
+
+    if (status == 'accepted') {
+      // Start Job + Complete Job buttons side by side
+      return Row(
+        children: [
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => JobInProgressPage(
+                      jobId: widget.bookingId,
+                      customerName: booking!.userName,
+                      service: booking!.service,
+                      timeSlot: booking!.scheduledTime,
+                    ),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 2,
+              ),
+              child: const Text(
+                'Start Job',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CompleteJobPage(booking: booking!),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 2,
+              ),
+              child: const Text(
+                'Complete Job',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Default: Start Job button for any other status
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => JobInProgressPage(
+                jobId: widget.bookingId,
+                customerName: booking!.userName,
+                service: booking!.service,
+                timeSlot: booking!.scheduledTime,
+              ),
+            ),
+          );
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.green,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 2,
+        ),
+        child: const Text(
+          'Start Job',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
         ),
       ),
     );

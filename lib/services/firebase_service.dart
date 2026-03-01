@@ -510,7 +510,9 @@ class FirebaseService {
     }
   }
 
-  /// Stream pending bookings for technician by pincode (real-time)
+  /// Stream available bookings for technician — shows ALL bookings that:
+  /// 1. Have not been completed / cancelled / rejected
+  /// 2. Have no technician assigned yet (technicianId is null or empty)
   static Stream<List<BookingModel>> streamPendingBookingsForTechnician({
     required String pincode,
     required List<String> specializations,
@@ -518,61 +520,62 @@ class FirebaseService {
     return _realtimeDb.ref('bookings')
         .onValue
         .map((event) {
-      if (event.snapshot.exists && event.snapshot.value != null) {
-        final bookingsMap = Map<String, dynamic>.from(event.snapshot.value as Map);
-        
-        final filteredBookings = bookingsMap.entries
-            .map((entry) {
-              final bookingData = Map<String, dynamic>.from(entry.value);
-              bookingData['id'] = entry.key; // Add the booking ID
-              return BookingModel.fromJson(bookingData);
-            })
-            .where((booking) {
-              // ✅ CRITICAL FIX: Exclude ALL non-pending jobs
-              // Only show pending and confirmed jobs to technicians
-              if (booking.status != 'pending' && booking.status != 'confirmed') {
-                debugPrint('🚫 Filtering out job ${booking.id} with status: ${booking.status}');
-                return false;
-              }
-              
-              // Check if booking is expired (older than 24 hours)
-              final isExpired = _isBookingExpired(booking);
-              if (isExpired) {
-                debugPrint('⏰ Filtering out expired job ${booking.id}');
-                return false;
-              }
-              
-              // Handle missing pincode by extracting from address
-              String? bookingPincode = booking.pincode;
-              if (bookingPincode == null || bookingPincode.isEmpty) {
-                // Try to extract pincode from address (last 6 digits)
-                final address = booking.address ?? '';
-                final pincodeRegex = RegExp(r'\b\d{6}\b');
-                final match = pincodeRegex.firstMatch(address);
-                bookingPincode = match?.group(0);
-              }
-              
-              // Filter by pincode match
-              final pincodeMatch = bookingPincode == pincode;
-              
-              // Filter by service specialization match
-              final serviceMatch = specializations.contains(booking.service) || 
-                                 _isServiceMatch(booking.service, specializations);
-              
-              final shouldShow = pincodeMatch && serviceMatch;
-              if (shouldShow) {
-                debugPrint('✅ Showing job ${booking.id}: ${booking.service} in $bookingPincode');
-              }
-              
-              return shouldShow;
-            })
-            .toList()
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        
-        debugPrint('📋 Filtered ${filteredBookings.length} jobs for technician in $pincode');
-        return filteredBookings;
+      if (!event.snapshot.exists || event.snapshot.value == null) {
+        debugPrint('📋 No bookings in database');
+        return <BookingModel>[];
       }
-      return <BookingModel>[];
+
+      final bookingsMap =
+          Map<String, dynamic>.from(event.snapshot.value as Map);
+
+      debugPrint('📋 Total bookings in DB: ${bookingsMap.length}');
+
+      // Log raw data once per update so we can diagnose
+      bookingsMap.forEach((key, value) {
+        final b = Map<String, dynamic>.from(value as Map);
+        debugPrint(
+          '  📄 $key | status="${b['status']}" | techId="${b['technicianId']}"'
+          ' | service="${b['service']}" | pincode="${b['pincode']}"',
+        );
+      });
+
+      // Statuses that mean "job is done / no longer available"
+      const closedStatuses = {
+        'completed', 'cancelled', 'rejected', 'declined',
+        'expired', 'failed', 'refunded',
+      };
+
+      final result = bookingsMap.entries
+          .map((entry) {
+            final bookingData =
+                Map<String, dynamic>.from(entry.value as Map);
+            bookingData['id'] = entry.key;
+            return BookingModel.fromJson(bookingData);
+          })
+          .where((booking) {
+            final status = booking.status.toLowerCase().trim();
+
+            // Hide jobs that are done
+            if (closedStatuses.contains(status)) {
+              debugPrint('🚫 ${booking.id}: closed status "$status"');
+              return false;
+            }
+
+            // Hide jobs already assigned to a technician
+            final techId = (booking.technicianId ?? '').trim();
+            if (techId.isNotEmpty && techId != 'unassigned' && techId != 'none') {
+              debugPrint('🚫 ${booking.id}: already assigned to "$techId"');
+              return false;
+            }
+
+            debugPrint('✅ ${booking.id}: showing (status="$status", techId="$techId")');
+            return true;
+          })
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      debugPrint('📋 Jobs shown to technician: ${result.length} / ${bookingsMap.length}');
+      return result;
     });
   }
 
@@ -1350,6 +1353,111 @@ class FirebaseService {
 
       return pricing;
     });
+  }
+
+  // ========== PROFILE & KYC OPERATIONS ==========
+
+  /// Update technician profile fields
+  static Future<void> updateTechnicianProfile(String uid, Map<String, dynamic> data) async {
+    try {
+      data['updatedAt'] = DateTime.now().toIso8601String();
+      await _realtimeDb.ref('technicians/$uid').update(data);
+      debugPrint('✅ Technician profile updated: $uid');
+    } catch (e) {
+      debugPrint('❌ Error updating technician profile: $e');
+      rethrow;
+    }
+  }
+
+  /// Upload KYC document URL and save to Firebase (no Storage, store URL directly)
+  static Future<void> uploadKYCDocument(String uid, String type, String imageUrl) async {
+    try {
+      debugPrint('📄 Saving KYC document ($type) for technician: $uid');
+      await _realtimeDb.ref('technicians/$uid/kyc').update({
+        type: imageUrl,
+        '${type}Status': 'pending_review',
+        '${type}UploadedAt': DateTime.now().toIso8601String(),
+      });
+      debugPrint('✅ KYC document saved: $type');
+    } catch (e) {
+      debugPrint('❌ Error saving KYC document: $e');
+      rethrow;
+    }
+  }
+
+  /// Get recent notifications combining FCM notifications + pending bookings
+  static Future<List<Map<String, dynamic>>> getRecentNotifications(
+    String technicianId,
+    String pincode,
+    List<String> specializations,
+  ) async {
+    try {
+      final List<Map<String, dynamic>> allNotifications = [];
+
+      // Fetch recent pending bookings matching pincode + specializations
+      final snapshot = await _realtimeDb.ref('bookings').get();
+      if (snapshot.exists && snapshot.value != null) {
+        final bookingsMap = Map<String, dynamic>.from(snapshot.value as Map);
+        final now = DateTime.now();
+
+        for (final entry in bookingsMap.entries) {
+          final bookingData = Map<String, dynamic>.from(entry.value);
+          bookingData['id'] = entry.key;
+
+          final status = bookingData['status']?.toString() ?? '';
+          if (status != 'pending') continue;
+
+          // Pincode check
+          String? bookingPincode = bookingData['pincode']?.toString();
+          if (bookingPincode == null || bookingPincode.isEmpty) {
+            final address = bookingData['address']?.toString() ?? '';
+            final match = RegExp(r'\b\d{6}\b').firstMatch(address);
+            bookingPincode = match?.group(0);
+          }
+          if (bookingPincode != pincode) continue;
+
+          // Service match
+          final service = bookingData['service']?.toString() ?? '';
+          final serviceMatch = specializations.contains(service) ||
+              _isServiceMatch(service, specializations);
+          if (!serviceMatch) continue;
+
+          // Only bookings from last 24h
+          try {
+            final createdAt = DateTime.parse(bookingData['createdAt'].toString());
+            if (now.difference(createdAt).inHours > 24) continue;
+          } catch (_) {}
+
+          allNotifications.add({
+            'type': 'new_booking',
+            'title': '🔔 New Job Available!',
+            'body': '${bookingData['service']} in $bookingPincode - ₹${bookingData['totalAmount'] ?? 'N/A'}',
+            'service': service,
+            'amount': bookingData['totalAmount']?.toString(),
+            'bookingId': entry.key,
+            'customerName': bookingData['userName'],
+            'timestamp': bookingData['createdAt'],
+            'source': 'firebase',
+          });
+        }
+      }
+
+      // Sort by timestamp descending
+      allNotifications.sort((a, b) {
+        try {
+          return DateTime.parse(b['timestamp'].toString())
+              .compareTo(DateTime.parse(a['timestamp'].toString()));
+        } catch (_) {
+          return 0;
+        }
+      });
+
+      debugPrint('🔔 getRecentNotifications: found ${allNotifications.length} items');
+      return allNotifications;
+    } catch (e) {
+      debugPrint('❌ Error fetching recent notifications: $e');
+      return [];
+    }
   }
 
   /// Get service by ID

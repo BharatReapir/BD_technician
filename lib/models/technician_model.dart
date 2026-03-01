@@ -49,6 +49,7 @@ class TechnicianModel {
   final String? profileImage;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final Map<String, dynamic>? kycDocuments; // KYC doc upload status
 
   TechnicianModel({
     required this.uid,
@@ -67,6 +68,7 @@ class TechnicianModel {
     this.profileImage,
     required this.createdAt,
     this.updatedAt,
+    this.kycDocuments,
   });
 
   Map<String, dynamic> toJson() {
@@ -87,6 +89,7 @@ class TechnicianModel {
       'profileImage': profileImage,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'kyc': kycDocuments,
     };
   }
 
@@ -110,6 +113,9 @@ class TechnicianModel {
       updatedAt: json['updatedAt'] != null
           ? _parseDate(json['updatedAt'])
           : null,
+      kycDocuments: json['kyc'] != null
+          ? Map<String, dynamic>.from(json['kyc'] as Map)
+          : null,
     );
   }
 
@@ -130,6 +136,7 @@ class TechnicianModel {
     String? profileImage,
     DateTime? createdAt,
     DateTime? updatedAt,
+    Map<String, dynamic>? kycDocuments,
   }) {
     return TechnicianModel(
       uid: uid ?? this.uid,
@@ -148,6 +155,7 @@ class TechnicianModel {
       profileImage: profileImage ?? this.profileImage,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      kycDocuments: kycDocuments ?? this.kycDocuments,
     );
   }
 }

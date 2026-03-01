@@ -8,13 +8,16 @@ import '../services/firebase_service.dart';
 import '../services/pdf_service.dart';
 import '../services/coin_service.dart';
 import '../models/billing_model.dart';
+import '../models/booking_model.dart';
 import '../providers/auth_provider.dart';
+import 'complete_job_page.dart';
 
 class JobInProgressPage extends StatefulWidget {
   final String jobId;
   final String customerName;
   final String service;
   final String timeSlot;
+  final BookingModel? bookingModel; // Optional booking for Complete Job navigation
 
   const JobInProgressPage({
     Key? key,
@@ -22,6 +25,7 @@ class JobInProgressPage extends StatefulWidget {
     required this.customerName,
     required this.service,
     required this.timeSlot,
+    this.bookingModel,
   }) : super(key: key);
 
   @override
@@ -610,7 +614,40 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _completeJob,
+                  onPressed: () async {
+                    // If we have a booking model, navigate to CompleteJobPage
+                    if (widget.bookingModel != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CompleteJobPage(
+                            booking: widget.bookingModel!,
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+
+                    // Fallback: fetch booking from Firebase and navigate
+                    try {
+                      final fetchedBooking = await FirebaseService.getBooking(widget.jobId);
+                      if (fetchedBooking != null && mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CompleteJobPage(
+                              booking: fetchedBooking,
+                            ),
+                          ),
+                        );
+                      } else {
+                        // Last resort: call old _completeJob flow
+                        _completeJob();
+                      }
+                    } catch (_) {
+                      _completeJob();
+                    }
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     padding: const EdgeInsets.symmetric(vertical: 16),

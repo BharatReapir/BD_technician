@@ -2,17 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../constants/colors.dart';
 import '../providers/auth_provider.dart';
 import '../services/wallet_service.dart';
 import '../services/firebase_service.dart';
-import '../services/fcm_service.dart'; // 🔔 NEW: FCM Service
+import '../services/fcm_service.dart'; // 🔔 FCM Service
 import '../models/technician_model.dart';
 import '../models/booking_model.dart';
 import '../utils/commission_calculator.dart';
 import 'tech_wallet_page.dart';
 import 'job_details_page.dart';
-import 'landing_page.dart';
+import 'technician_login_page.dart';
 
 class TechnicianHomePage extends StatefulWidget {
   const TechnicianHomePage({Key? key}) : super(key: key);
@@ -23,6 +25,7 @@ class TechnicianHomePage extends StatefulWidget {
 
 class _TechnicianHomePageState extends State<TechnicianHomePage> {
   int _currentIndex = 0;
+  int _notificationCount = 0; // Badge count for notifications
 
   @override
   Widget build(BuildContext context) {
@@ -46,12 +49,203 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
           builder: (context, snapshot) {
             final currentTechnician = snapshot.data ?? technician;
 
+            Widget currentPage;
+            switch (_currentIndex) {
+              case 0:
+                currentPage = _buildHomePage(currentTechnician, authProvider);
+                break;
+              case 1:
+                currentPage = _buildJobsPage(currentTechnician);
+                break;
+              case 2:
+                currentPage = TechWalletPage(technicianId: currentTechnician.uid);
+                break;
+              case 3:
+                currentPage = _buildProfilePage(currentTechnician, authProvider);
+                break;
+              default:
+                currentPage = _buildHomePage(currentTechnician, authProvider);
+            }
+
             return Scaffold(
-              body: _currentIndex == 0 
-                  ? _buildHomePage(currentTechnician, authProvider) 
-                  : _buildProfilePage(currentTechnician, authProvider),
+              body: currentPage,
               bottomNavigationBar: _buildBottomNavBar(),
             );
+          },
+        );
+      },
+    );
+  }
+  
+  Widget _buildJobsPage(TechnicianModel technician) {
+    return Container(
+      color: const Color(0xFFF5F5F5),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              color: const Color(0xFF2563EB),
+              child: Row(
+                children: [
+                  const Text(
+                    'My Jobs',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () {},
+                    icon: const Icon(Icons.filter_list, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+            // Tabs for All, Pending, Active, Done
+            Container(
+              color: Colors.white,
+              child: DefaultTabController(
+                length: 4,
+                child: Column(
+                  children: [
+                    const TabBar(
+                      labelColor: Color(0xFF2563EB),
+                      unselectedLabelColor: Colors.grey,
+                      indicatorColor: Color(0xFF2563EB),
+                      tabs: [
+                        Tab(text: 'All'),
+                        Tab(text: 'Pending'),
+                        Tab(text: 'Active'),
+                        Tab(text: 'Done'),
+                      ],
+                    ),
+                    SizedBox(
+                      height: MediaQuery.of(context).size.height - 220,
+                      child: TabBarView(
+                        children: [
+                          _buildAllJobsList(technician),
+                          _buildPendingJobsList(technician),
+                          _buildActiveJobsList(technician),
+                          _buildCompletedJobsList(technician),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildAllJobsList(TechnicianModel technician) {
+    return StreamBuilder<List<BookingModel>>(
+      stream: FirebaseService.streamTechnicianBookings(technician.uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        final bookings = snapshot.data ?? [];
+        
+        if (bookings.isEmpty) {
+          return const Center(child: Text('No jobs yet'));
+        }
+        
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: bookings.length,
+          itemBuilder: (context, index) {
+            return _buildJobCard(context, technician, bookings[index]);
+          },
+        );
+      },
+    );
+  }
+  
+  Widget _buildPendingJobsList(TechnicianModel technician) {
+    return StreamBuilder<List<BookingModel>>(
+      stream: FirebaseService.streamPendingBookingsForTechnician(
+        pincode: technician.primaryPincode,
+        specializations: technician.specializations,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        final bookings = snapshot.data ?? [];
+        
+        if (bookings.isEmpty) {
+          return const Center(child: Text('No pending jobs'));
+        }
+        
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: bookings.length,
+          itemBuilder: (context, index) {
+            return _buildJobCard(context, technician, bookings[index]);
+          },
+        );
+      },
+    );
+  }
+  
+  Widget _buildActiveJobsList(TechnicianModel technician) {
+    return StreamBuilder<List<BookingModel>>(
+      stream: FirebaseService.streamTechnicianBookings(technician.uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        final allBookings = snapshot.data ?? [];
+        final activeBookings = allBookings.where((b) => 
+          b.status == 'accepted' || b.status == 'in_progress'
+        ).toList();
+        
+        if (activeBookings.isEmpty) {
+          return const Center(child: Text('No active jobs'));
+        }
+        
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: activeBookings.length,
+          itemBuilder: (context, index) {
+            return _buildJobCard(context, technician, activeBookings[index]);
+          },
+        );
+      },
+    );
+  }
+  
+  Widget _buildCompletedJobsList(TechnicianModel technician) {
+    return StreamBuilder<List<BookingModel>>(
+      stream: FirebaseService.streamTechnicianBookings(technician.uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        final allBookings = snapshot.data ?? [];
+        final completedBookings = allBookings.where((b) => 
+          b.status == 'completed'
+        ).toList();
+        
+        if (completedBookings.isEmpty) {
+          return const Center(child: Text('No completed jobs'));
+        }
+        
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: completedBookings.length,
+          itemBuilder: (context, index) {
+            return _buildJobCard(context, technician, completedBookings[index]);
           },
         );
       },
@@ -67,15 +261,29 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
         });
       },
       type: BottomNavigationBarType.fixed,
-      selectedItemColor: AppColors.primary,
+      selectedItemColor: const Color(0xFF2563EB),
       unselectedItemColor: Colors.grey,
+      backgroundColor: Colors.white,
+      elevation: 8,
       items: const [
         BottomNavigationBarItem(
-          icon: Icon(Icons.home),
+          icon: Icon(Icons.home_outlined),
+          activeIcon: Icon(Icons.home),
           label: 'Home',
         ),
         BottomNavigationBarItem(
-          icon: Icon(Icons.person),
+          icon: Icon(Icons.work_outline),
+          activeIcon: Icon(Icons.work),
+          label: 'Jobs',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.account_balance_wallet_outlined),
+          activeIcon: Icon(Icons.account_balance_wallet),
+          label: 'Wallet',
+        ),
+        BottomNavigationBarItem(
+          icon: Icon(Icons.person_outline),
+          activeIcon: Icon(Icons.person),
           label: 'Profile',
         ),
       ],
@@ -84,183 +292,304 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
 
   Widget _buildHomePage(TechnicianModel currentTechnician, AuthProvider authProvider) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF0047AB),
-            Color(0xFF0056C8),
-          ],
-        ),
-      ),
+      color: const Color(0xFF2563EB), // Blue background
       child: SafeArea(
         child: Column(
           children: [
+            // Header with profile and wallet
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(20.0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Welcome, ${currentTechnician.name.split(' ')[0]}!',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: Colors.white,
+                    child: Text(
+                      currentTechnician.name.isNotEmpty 
+                          ? currentTechnician.name[0].toUpperCase()
+                          : 'T',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2563EB),
                       ),
-                      const Text(
-                        'Ready to work?',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  Row(
-                    children: [
-                      // 🔔 NEW: Notification Bell Button
-                      Container(
-                        margin: const EdgeInsets.only(right: 12),
-                        child: Stack(
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          currentTechnician.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Row(
                           children: [
-                            IconButton(
-                              onPressed: () => _showNotifications(context),
-                              icon: const Icon(
-                                Icons.notifications,
+                            const Icon(Icons.star, color: Colors.amber, size: 16),
+                            const SizedBox(width: 4),
+                            Text(
+                              currentTechnician.rating.toStringAsFixed(1),
+                              style: const TextStyle(
                                 color: Colors.white,
-                                size: 28,
-                              ),
-                              style: IconButton.styleFrom(
-                                backgroundColor: Colors.white.withOpacity(0.2),
-                                padding: const EdgeInsets.all(8),
-                              ),
-                            ),
-                            // Notification badge (optional - can be enhanced later)
-                            Positioned(
-                              right: 8,
-                              top: 8,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
+                                fontSize: 14,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      // ONLINE/OFFLINE Toggle Button
-                      GestureDetector(
-                        onTap: () => _toggleOnlineStatus(currentTechnician),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // Notification Bell with badge
+                  GestureDetector(
+                    onTap: () => _showNotifications(context, currentTechnician),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: currentTechnician.isOnline ? Colors.green : Colors.red,
-                            borderRadius: BorderRadius.circular(20),
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                currentTechnician.isOnline ? Icons.wifi : Icons.wifi_off,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                currentTechnician.isOnline ? 'ONLINE' : 'OFFLINE',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.touch_app,
-                                color: Colors.white70,
-                                size: 12,
-                              ),
-                            ],
+                          child: const Icon(
+                            Icons.notifications_outlined,
+                            color: Colors.white,
+                            size: 22,
                           ),
                         ),
+                        if (_notificationCount > 0)
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              constraints: const BoxConstraints(
+                                minWidth: 18,
+                                minHeight: 18,
+                              ),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                _notificationCount > 9
+                                    ? '9+'
+                                    : '$_notificationCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TechWalletPage(
+                            technicianId: currentTechnician.uid,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                    ],
+                      child: Row(
+                        children: [
+                          const Icon(Icons.account_balance_wallet, color: Colors.white, size: 20),
+                          const SizedBox(width: 6),
+                          Text(
+                            '₹${currentTechnician.walletBalance.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
+            
+            // Online status toggle
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            currentTechnician.isOnline ? "You're Online" : "You're Offline",
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          Text(
+                            currentTechnician.isOnline 
+                                ? 'Ready to accept bookings'
+                                : 'Turn on to receive bookings',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: currentTechnician.isOnline,
+                      onChanged: (value) => _toggleOnlineStatus(currentTechnician),
+                      activeColor: Colors.green,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // Stats cards
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
               child: Row(
                 children: [
                   Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => TechWalletPage(
-                              technicianId: currentTechnician.uid,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '${currentTechnician.totalJobs}',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2563EB),
                             ),
                           ),
-                        );
-                      },
-                      child: _buildStatCard(
-                        '₹${currentTechnician.walletBalance.toStringAsFixed(0)}',
-                        'Wallet',
-                        Icons.account_balance_wallet,
+                          const SizedBox(height: 4),
+                          const Text(
+                            "Today's Jobs",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _buildStatCard(
-                      '${currentTechnician.completedJobs ?? 0}',
-                      'Jobs Done',
-                      Icons.work,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      '${currentTechnician.rating.toStringAsFixed(1)}',
-                      'Rating',
-                      Icons.star,
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '${currentTechnician.completedJobs ?? 0}',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2563EB),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'Completed',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            
+            const SizedBox(height: 20),
+            
+            // Recent Jobs section
             Expanded(
               child: Container(
                 decoration: const BoxDecoration(
-                  color: Colors.white,
+                  color: Color(0xFFF5F5F5),
                   borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(30),
-                    topRight: Radius.circular(30),
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
                   ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.all(24.0),
-                      child: Text(
-                        "Today's Jobs",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
+                    Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Recent Jobs',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          // Debug info
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              'Pincode: ${currentTechnician.primaryPincode}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.blue,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Expanded(
@@ -270,11 +599,20 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                           specializations: currentTechnician.specializations,
                         ),
                         builder: (context, snapshot) {
+                          // Debug logging
+                          debugPrint('🏠 HOME PAGE - Stream State: ${snapshot.connectionState}');
+                          debugPrint('🏠 HOME PAGE - Has Error: ${snapshot.hasError}');
+                          debugPrint('🏠 HOME PAGE - Has Data: ${snapshot.hasData}');
+                          debugPrint('🏠 HOME PAGE - Technician Pincode: ${currentTechnician.primaryPincode}');
+                          debugPrint('🏠 HOME PAGE - Technician Services: ${currentTechnician.specializations}');
+                          debugPrint('🏠 HOME PAGE - Technician Online: ${currentTechnician.isOnline}');
+                          
                           if (snapshot.connectionState == ConnectionState.waiting) {
                             return const Center(child: CircularProgressIndicator());
                           }
                           
                           if (snapshot.hasError) {
+                            debugPrint('🏠 HOME PAGE - Error: ${snapshot.error}');
                             return Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -284,9 +622,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                                   Text('Error: ${snapshot.error}'),
                                   const SizedBox(height: 16),
                                   ElevatedButton(
-                                    onPressed: () {
-                                      setState(() {}); // Trigger rebuild
-                                    },
+                                    onPressed: () => setState(() {}),
                                     child: const Text('Retry'),
                                   ),
                                 ],
@@ -295,6 +631,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                           }
                           
                           final bookings = snapshot.data ?? [];
+                          debugPrint('🏠 HOME PAGE - Jobs Count: ${bookings.length}');
                           
                           if (bookings.isEmpty) {
                             return Center(
@@ -308,43 +645,46 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                                   ),
                                   const SizedBox(height: 16),
                                   const Text(
-                                    'No jobs available in your area',
+                                    'No jobs available',
                                     style: TextStyle(
                                       fontSize: 16,
                                       color: Colors.grey,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
                                     'Pincode: ${currentTechnician.primaryPincode}',
                                     style: const TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 13,
                                       color: Colors.grey,
                                     ),
                                   ),
                                   Text(
                                     'Services: ${currentTechnician.specializations.join(", ")}',
                                     style: const TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 13,
                                       color: Colors.grey,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 16),
-                                  ElevatedButton(
-                                    onPressed: () => _forceOnlineStatus(currentTechnician),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green,
+                                  if (!currentTechnician.isOnline)
+                                    ElevatedButton(
+                                      onPressed: () => _forceOnlineStatus(currentTechnician),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.green,
+                                      ),
+                                      child: const Text('GO ONLINE'),
                                     ),
-                                    child: const Text('GO ONLINE'),
-                                  ),
                                   const SizedBox(height: 8),
-                                  OutlinedButton(
-                                    onPressed: () => _testNotifications(),
+                                  OutlinedButton.icon(
+                                    onPressed: () => _debugFirebaseConnection(currentTechnician),
+                                    icon: const Icon(Icons.bug_report, size: 18),
+                                    label: const Text('Debug Connection'),
                                     style: OutlinedButton.styleFrom(
-                                      foregroundColor: AppColors.primary,
+                                      foregroundColor: Colors.orange,
                                     ),
-                                    child: const Text('Test Notifications'),
                                   ),
                                 ],
                               ),
@@ -356,7 +696,8 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                             itemCount: bookings.length,
                             itemBuilder: (context, index) {
                               final booking = bookings[index];
-                              return _buildRealJobCard(
+                              debugPrint('🏠 Displaying job: ${booking.id} - ${booking.service}');
+                              return _buildJobCard(
                                 context,
                                 currentTechnician,
                                 booking,
@@ -378,267 +719,300 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
 
   Widget _buildProfilePage(TechnicianModel currentTechnician, AuthProvider authProvider) {
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF0047AB),
-            Color(0xFF0056C8),
-          ],
-        ),
-      ),
+      color: Colors.white,
       child: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
+            // Profile header with functioning Edit button
+            Container(
+              padding: const EdgeInsets.all(20),
+              color: Colors.white,
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 40,
-                    backgroundColor: Colors.white,
-                    child: Text(
-                      currentTechnician.name.isNotEmpty 
-                          ? currentTechnician.name[0].toUpperCase()
-                          : 'T',
-                      style: const TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0047AB),
-                      ),
+                  const Text(
+                    'My Profile',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          currentTechnician.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Technician ID: ${currentTechnician.uid.substring(0, 8)}...',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () => _showEditProfileSheet(currentTechnician),
+                    icon: const Icon(Icons.edit_outlined, size: 18,
+                        color: Color(0xFF2563EB)),
+                    label: const Text(
+                      'Edit',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Color(0xFF2563EB),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            
             Expanded(
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(30),
-                    topRight: Radius.circular(30),
-                  ),
-                ),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Personal Information',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    // Profile Card
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 20),
-                      
-                      _buildProfileItem(
-                        icon: Icons.person,
-                        label: 'Full Name',
-                        value: currentTechnician.name,
-                      ),
-                      
-                      _buildProfileItem(
-                        icon: Icons.email,
-                        label: 'Email',
-                        value: currentTechnician.email,
-                      ),
-                      
-                      _buildProfileItem(
-                        icon: Icons.phone,
-                        label: 'Mobile Number',
-                        value: currentTechnician.mobile,
-                      ),
-                      
-                      _buildProfileItem(
-                        icon: Icons.location_city,
-                        label: 'City',
-                        value: currentTechnician.city,
-                      ),
-                      
-                      _buildProfileItem(
-                        icon: Icons.pin_drop,
-                        label: 'Primary Pincode',
-                        value: currentTechnician.primaryPincode,
-                      ),
-                      
-                      const SizedBox(height: 20),
-                      
-                      // ✅ NEW: Job Statistics Section
-                      const Text(
-                        'Job Statistics',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.green.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.green,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(
-                                Icons.check_circle,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${currentTechnician.completedJobs ?? 0}',
-                                    style: const TextStyle(
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green,
-                                    ),
-                                  ),
-                                  const Text(
-                                    'Jobs Completed',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black54,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if ((currentTechnician.completedJobs ?? 0) > 0) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.green,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Text(
-                                  '🎉 Great Work!',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 20),
-                      
-                      const Text(
-                        'Services',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: currentTechnician.specializations.map((service) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: AppColors.primary),
-                            ),
+                      child: Column(
+                        children: [
+                          CircleAvatar(
+                            radius: 50,
+                            backgroundColor: const Color(0xFF2563EB).withOpacity(0.1),
                             child: Text(
-                              service,
+                              currentTechnician.name.isNotEmpty 
+                                  ? currentTechnician.name[0].toUpperCase()
+                                  : 'T',
                               style: const TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w500,
+                                fontSize: 40,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2563EB),
                               ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      
-                      const SizedBox(height: 30),
-                      
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: () => _showLogoutDialog(authProvider),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
-                          child: const Row(
+                          const SizedBox(height: 16),
+                          Text(
+                            currentTechnician.name,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            currentTechnician.mobile,
+                            style: TextStyle(
+                              fontSize: 15,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.logout),
-                              SizedBox(width: 8),
+                              const Icon(Icons.star, color: Colors.amber, size: 20),
+                              const SizedBox(width: 4),
                               Text(
-                                'Logout',
-                                style: TextStyle(
+                                currentTechnician.rating.toStringAsFixed(1),
+                                style: const TextStyle(
                                   fontSize: 18,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
                                 ),
                               ),
                             ],
                           ),
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // Professional Information
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.work, color: Color(0xFF2563EB), size: 20),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Professional Information',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          _buildInfoRow2('Service Category', currentTechnician.specializations.join(', ')),
+                          const SizedBox(height: 12),
+                          _buildInfoRow2('Experience', '5 years'),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Working Areas
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on, color: Color(0xFF2563EB), size: 20),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Working Areas',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              _buildAreaChip(currentTechnician.city),
+                              _buildAreaChip('Pincode: ${currentTechnician.primaryPincode}'),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // KYC Documents with real Upload buttons
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.verified_user,
+                                  color: Color(0xFF2563EB), size: 20),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'KYC Documents',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          _buildKycRow(
+                            label: 'Aadhaar Card',
+                            technicianId: currentTechnician.uid,
+                            kycType: 'aadhaar',
+                            isUploaded: (currentTechnician.kycDocuments?['aadhaar'] != null),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildKycRow(
+                            label: 'PAN Card',
+                            technicianId: currentTechnician.uid,
+                            kycType: 'pan',
+                            isUploaded: (currentTechnician.kycDocuments?['pan'] != null),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    const SizedBox(height: 32),
+                  ],
                 ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildInfoRow2(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            color: Colors.grey[600],
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 15,
+            color: Colors.black87,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildAreaChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 13,
+          color: Colors.black87,
         ),
       ),
     );
@@ -724,7 +1098,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   Navigator.of(context).pop();
                   Navigator.pushAndRemoveUntil(
                     context,
-                    MaterialPageRoute(builder: (context) => const LandingPage()),
+                    MaterialPageRoute(builder: (context) => const TechnicianLoginPage()),
                     (route) => false,
                   );
                 }
@@ -783,165 +1157,217 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     );
   }
 
-  Widget _buildRealJobCard(
+  Widget _buildJobCard(
     BuildContext context,
     TechnicianModel technician,
     BookingModel booking,
   ) {
     final calculatedEarnings = CommissionCalculator.getTechnicianEarnings(booking.totalAmount);
     
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      elevation: 4,
-      shape: RoundedRectangleBorder(
+    // Determine status color and text
+    Color statusColor = Colors.green;
+    String statusText = 'completed';
+    
+    if (booking.status == 'pending') {
+      statusColor = Colors.orange;
+      statusText = 'pending';
+    } else if (booking.status == 'in_progress') {
+      statusColor = Colors.orange;
+      statusText = 'in-progress';
+    }
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        booking.service,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Pincode: ${booking.pincode}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                      Text(
-                        booking.address ?? 'Address not available',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    booking.scheduledTime,
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Customer:', style: TextStyle(fontSize: 14)),
                     Text(
                       booking.userName,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Total Amount:', style: TextStyle(fontSize: 14)),
-                    Text(
-                      '₹${booking.totalAmount.toStringAsFixed(0)}',
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Your Earnings:', style: TextStyle(fontSize: 14)),
-                    Text(
-                      '₹${calculatedEarnings.toStringAsFixed(0)}',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.green,
+                        color: Colors.black87,
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text('Booking ID:', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const SizedBox(height: 4),
                     Text(
-                      booking.id?.substring(0, 8) ?? 'N/A',
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      booking.service,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => {
-                      debugPrint('🎯 ACCEPT BUTTON PRESSED'),
-                      debugPrint('🎯 Booking ID from card: ${booking.id}'),
-                      debugPrint('🎯 Booking service: ${booking.service}'),
-                      debugPrint('🎯 Booking customer: ${booking.userName}'),
-                      _acceptBooking(booking.id!, technician.uid, technician.name)
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Text(
-                      'Accept Job',
+                    child: Text(
+                      statusText,
                       style: TextStyle(
-                        fontSize: 16,
+                        color: statusColor,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '₹${booking.totalAmount.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2563EB),
+                    ),
+                  ),
+                  Text(
+                    '${(booking.address?.split(',').last.trim() ?? '').replaceAll(RegExp(r'[^0-9.]'), '')} km',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  booking.address ?? 'Address not available',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 4),
+              Text(
+                booking.scheduledTime,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+          if (booking.status == 'pending') ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                // View Details first so techs can check invoice before accepting
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => JobDetailsPage(
+                            bookingId: booking.id,
+                            technicianId: technician.uid,
+                          ),
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF2563EB),
+                      side: const BorderSide(color: Color(0xFF2563EB)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'View Details',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _acceptBooking(booking.id, technician.uid, technician.name),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Accept Job',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
+          ] else ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => JobDetailsPage(
+                            bookingId: booking.id,
+                            technicianId: technician.uid,
+                          ),
+                        ),
+                      );
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF2563EB),
+                    ),
+                    child: const Text('View Details →'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -1196,14 +1622,14 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     }
   }
 
-  /// Show notifications panel
-  void _showNotifications(BuildContext context) {
+  /// Show dynamic notifications panel
+  void _showNotifications(BuildContext context, TechnicianModel technician) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
+        height: MediaQuery.of(context).size.height * 0.75,
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.only(
@@ -1213,6 +1639,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
         ),
         child: Column(
           children: [
+            // Header
             Container(
               padding: const EdgeInsets.all(20),
               decoration: const BoxDecoration(
@@ -1235,12 +1662,6 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     ),
                   ),
                   const Spacer(),
-                  // Add test notification button
-                  IconButton(
-                    onPressed: () => _testNotifications(),
-                    icon: const Icon(Icons.bug_report, color: Colors.white),
-                    tooltip: 'Test Notifications',
-                  ),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close, color: Colors.white),
@@ -1248,120 +1669,123 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                 ],
               ),
             ),
+            // Dynamic notifications list
             Expanded(
               child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: FCMService.getPendingNotifications(),
+                future: FirebaseService.getRecentNotifications(
+                  technician.uid,
+                  technician.primaryPincode,
+                  technician.specializations,
+                ),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  
+
                   final notifications = snapshot.data ?? [];
-                  
-                  debugPrint('🔔 Notifications panel: Found ${notifications.length} notifications');
-                  for (var notif in notifications) {
-                    debugPrint('🔔 Notification: ${notif['title']} - ${notif['body']}');
-                  }
-                  
+
+                  // Update badge count after build
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      setState(() => _notificationCount = notifications.length);
+                    }
+                  });
+
                   if (notifications.isEmpty) {
                     return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.notifications_off, size: 64, color: Colors.grey),
+                          const Icon(Icons.notifications_off,
+                              size: 64, color: Colors.grey),
                           const SizedBox(height: 16),
                           const Text(
                             'No job alerts yet',
-                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                            style: TextStyle(
+                                fontSize: 16, color: Colors.grey),
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'You\'ll receive alerts when new jobs are available',
-                            style: TextStyle(fontSize: 14, color: Colors.grey),
+                            'You\'ll receive alerts when new jobs\nare available in your area',
+                            style: TextStyle(
+                                fontSize: 14, color: Colors.grey),
                             textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => _testNotifications(),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                            ),
-                            child: const Text('Test Notifications'),
                           ),
                         ],
                       ),
                     );
                   }
-                  
+
                   return ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: notifications.length,
                     itemBuilder: (context, index) {
                       final notification = notifications[index];
-                      final isJobAlert = notification['type'] == 'new_booking' || notification['type'] == 'job_alert';
-                      
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
-                        elevation: 3,
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           leading: CircleAvatar(
-                            backgroundColor: isJobAlert ? Colors.green : AppColors.primary,
-                            child: Icon(
-                              isJobAlert ? Icons.work : Icons.notifications,
-                              color: Colors.white,
+                            backgroundColor:
+                                Colors.green.withOpacity(0.15),
+                            child: const Icon(
+                              Icons.work,
+                              color: Colors.green,
                             ),
                           ),
                           title: Text(
-                            notification['title'] ?? 'Job Alert',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            notification['title'] ?? 'New Job Alert',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600),
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(notification['body'] ?? 'New job available'),
-                              if (isJobAlert && notification['service'] != null) ...[
-                                const SizedBox(height: 4),
+                              const SizedBox(height: 2),
+                              Text(notification['body'] ?? ''),
+                              if (notification['customerName'] !=
+                                  null) ...[  
+                                const SizedBox(height: 3),
                                 Text(
-                                  'Service: ${notification['service']} • Amount: ₹${notification['amount'] ?? 'N/A'}',
+                                  'Customer: ${notification['customerName']}',
                                   style: const TextStyle(
                                     fontSize: 12,
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF2563EB),
                                   ),
                                 ),
                               ],
                             ],
                           ),
                           trailing: Text(
-                            _formatNotificationTime(notification['timestamp']),
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            _formatNotificationTime(
+                                notification['timestamp']),
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.grey),
                           ),
+                          onTap: () {
+                            if (notification['bookingId'] != null) {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => JobDetailsPage(
+                                    bookingId: notification['bookingId'],
+                                    technicianId: technician.uid,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
                         ),
                       );
                     },
                   );
                 },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    await FCMService().clearPendingNotifications();
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Notifications cleared')),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text('Clear All Notifications'),
-                ),
               ),
             ),
           ],
@@ -1402,6 +1826,446 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+  
+  /// Debug Firebase connection and job data
+  Future<void> _debugFirebaseConnection(TechnicianModel technician) async {
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Reading Firebase...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final database = FirebaseDatabase.instanceFor(
+        app: Firebase.app(),
+        databaseURL:
+            'https://bharat-doorstep-native-default-rtdb.asia-southeast1.firebasedatabase.app/',
+      );
+
+      final snapshot = await database.ref('bookings').get();
+      if (mounted) Navigator.of(context).pop();
+
+      if (!snapshot.exists || snapshot.value == null) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Firebase Debug'),
+              content: const Text('⚠️ No bookings found in database at all.\n\nMake sure the user app is saving bookings to the same Firebase project.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+
+      final bookingsMap = Map<String, dynamic>.from(snapshot.value as Map);
+      final bookingsList = bookingsMap.entries.map((e) {
+        final data = Map<String, dynamic>.from(e.value as Map);
+        return {
+          'id': e.key.substring(0, 8),
+          'status': data['status'] ?? '?',
+          'pincode': data['pincode'] ?? 'none',
+          'service': data['service'] ?? '?',
+          'techId': (data['technicianId'] ?? '').toString().isEmpty ? 'none' : 'assigned',
+        };
+      }).toList();
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Firebase Bookings (${bookingsList.length} total)'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Your pincode: ${technician.primaryPincode}\n'
+                    'Your services: ${technician.specializations.join(", ")}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.blue,
+                    ),
+                  ),
+                  const Divider(),
+                  ...bookingsList.map((b) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.grey.shade300),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('ID: ${b['id']}...', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          Text('Status: ${b['status']}', style: TextStyle(
+                            fontSize: 12,
+                            color: b['status'] == 'pending' ? Colors.green
+                              : b['status'] == 'confirmed' ? Colors.orange
+                              : Colors.red,
+                            fontWeight: FontWeight.w600,
+                          )),
+                          Text('Pincode: ${b['pincode']}', style: const TextStyle(fontSize: 12)),
+                          Text('Service: ${b['service']}', style: const TextStyle(fontSize: 12)),
+                          Text('Assigned: ${b['techId']}', style: const TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  )),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Debug failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+
+  // ===== EDIT PROFILE =====
+
+  void _showEditProfileSheet(TechnicianModel technician) {
+    final nameController = TextEditingController(text: technician.name);
+    final bioController = TextEditingController(text: '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    'Edit Profile',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // Name field
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: 'Full Name',
+                  prefixIcon: const Icon(Icons.person_outline),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Bio field
+              TextField(
+                controller: bioController,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: 'About / Bio (optional)',
+                  prefixIcon: const Icon(Icons.info_outline),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  hintText: 'Brief description about yourself...',
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      final newName = nameController.text.trim();
+                      if (newName.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Name cannot be empty'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      await FirebaseService.updateTechnicianProfile(
+                        technician.uid,
+                        {
+                          'name': newName,
+                          if (bioController.text.trim().isNotEmpty)
+                            'bio': bioController.text.trim(),
+                        },
+                      );
+
+                      // Refresh technician data
+                      if (mounted) {
+                        final authProvider =
+                            Provider.of<AuthProvider>(context, listen: false);
+                        await authProvider.refreshTechnicianData();
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('✅ Profile updated!'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    'Save Changes',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===== KYC UPLOAD =====
+
+  Widget _buildKycRow({
+    required String label,
+    required String technicianId,
+    required String kycType,
+    required bool isUploaded,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Row(
+            children: [
+              Icon(
+                isUploaded ? Icons.check_circle : Icons.radio_button_unchecked,
+                color: isUploaded ? Colors.green : Colors.grey,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  if (isUploaded)
+                    const Text(
+                      'Uploaded — Pending Review',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.orange,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    )
+                  else
+                    const Text(
+                      'Not uploaded',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.grey,
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        TextButton(
+          onPressed: () => _uploadKYCDocument(technicianId, kycType),
+          style: TextButton.styleFrom(
+            foregroundColor: const Color(0xFF2563EB),
+          ),
+          child: Text(isUploaded ? 'Re-upload' : 'Upload'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _uploadKYCDocument(String technicianId, String kycType) async {
+    final picker = ImagePicker();
+
+    // Show image source options
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Color(0xFF2563EB)),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Color(0xFF2563EB)),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    try {
+      final XFile? image = await picker.pickImage(
+        source: source,
+        imageQuality: 70,
+      );
+      if (image == null) return;
+
+      // Show uploading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text('Uploading document...'),
+              ],
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+
+      // Save the file path as URL (in a real app you'd upload to Firebase Storage)
+      await FirebaseService.uploadKYCDocument(
+        technicianId,
+        kycType,
+        image.path,
+      );
+
+      if (mounted) {
+        // Refresh data to pick up changes
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        await authProvider.refreshTechnicianData();
+
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '✅ ${kycType == 'aadhaar' ? 'Aadhaar Card' : 'PAN Card'} uploaded. Pending review.',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        setState(() {}); // Rebuild to show new status
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 

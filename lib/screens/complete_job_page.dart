@@ -1,3 +1,4 @@
+import 'package:bdr_technician_app/services/coin_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -5,10 +6,8 @@ import 'package:signature/signature.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../models/booking_model.dart';
-import '../models/billing_model.dart';
 import '../services/firebase_service.dart';
 import '../services/pdf_service.dart';
-import '../services/coin_service.dart';
 import '../providers/auth_provider.dart';
 
 class CompleteJobPage extends StatefulWidget {
@@ -122,26 +121,17 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
       final technician = authProvider.technician;
       if (technician == null) throw Exception('Technician not found');
 
-      final billing = PricingCalculator.calculateBilling(
-        customerName: widget.booking.userName,
-        serviceAddress: widget.booking.address ?? 'N/A',
-        serviceName: widget.booking.service,
-        servicePrice: _serviceCharge,
-        pincode: widget.booking.pincode ?? '000000',
-        coinDiscount: widget.booking.coinDiscount ?? 0.0,
+      // Use Job Completion Certificate (not GST invoice — that's for the customer)
+      await PDFService.printJobCompletionCertificate(
+        booking: widget.booking,
         technicianName: technician.name,
-        bookingId: widget.booking.id,
-      );
-
-      await PDFService.generateGSTInvoice(
-        billing: billing,
-        downloadToDevice: true,
+        completedJobsCount: technician.completedJobs ?? 0,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Invoice generated successfully'),
+            content: Text('✅ Certificate generated successfully'),
             backgroundColor: Colors.green,
           ),
         );
@@ -150,7 +140,7 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error generating invoice: $e'),
+            content: Text('Error generating certificate: $e'),
             backgroundColor: Colors.red,
           ),
         );

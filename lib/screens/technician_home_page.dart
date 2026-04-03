@@ -9,8 +9,10 @@ import '../providers/auth_provider.dart';
 import '../services/wallet_service.dart';
 import '../services/firebase_service.dart';
 import '../services/fcm_service.dart'; // 🔔 FCM Service
+import '../services/pdf_service.dart'; // 📄 PDF Invoice
 import '../models/technician_model.dart';
 import '../models/booking_model.dart';
+import '../models/billing_model.dart'; // 💰 Billing Model
 import '../utils/commission_calculator.dart';
 import 'tech_wallet_page.dart';
 import 'job_details_page.dart';
@@ -478,77 +480,35 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
             
             const SizedBox(height: 20),
             
-            // Stats cards
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            '${currentTechnician.totalJobs}',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF2563EB),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            "Today's Jobs",
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+            // Stats cards — real-time from Firebase
+            StreamBuilder<List<BookingModel>>(
+              stream: FirebaseService.streamTechnicianBookings(currentTechnician.uid),
+              builder: (context, statsSnapshot) {
+                final allBookings = statsSnapshot.data ?? [];
+                final now = DateTime.now();
+                final todayJobs = allBookings.where((b) =>
+                  b.createdAt.year == now.year &&
+                  b.createdAt.month == now.month &&
+                  b.createdAt.day == now.day,
+                ).length;
+                final completedJobs = allBookings.where((b) => b.status == 'completed').length;
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                  child: Row(
+                    children: [
+                      Expanded(child: _buildStatCard(label: "Today's Jobs", value: '$todayJobs', icon: Icons.today_rounded, color: const Color(0xFF2563EB))),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildStatCard(label: 'Completed', value: '$completedJobs', icon: Icons.check_circle_outline_rounded, color: Colors.green)),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          Text(
-                            '${currentTechnician.completedJobs ?? 0}',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF2563EB),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            'Completed',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             
             const SizedBox(height: 20),
             
-            // Recent Jobs section
+            // Recent Jobs — shows active jobs + unassigned pending
             Expanded(
               child: Container(
                 decoration: const BoxDecoration(
@@ -561,35 +521,15 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            'Recent Jobs',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                          ),
-                          // Debug info
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              'Pincode: ${currentTechnician.primaryPincode}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Colors.blue,
-                              ),
-                            ),
-                          ),
-                        ],
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(20, 20, 20, 8),
+                      child: Text(
+                        'Recent Jobs',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
                     Expanded(
@@ -599,20 +539,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                           specializations: currentTechnician.specializations,
                         ),
                         builder: (context, snapshot) {
-                          // Debug logging
-                          debugPrint('🏠 HOME PAGE - Stream State: ${snapshot.connectionState}');
-                          debugPrint('🏠 HOME PAGE - Has Error: ${snapshot.hasError}');
-                          debugPrint('🏠 HOME PAGE - Has Data: ${snapshot.hasData}');
-                          debugPrint('🏠 HOME PAGE - Technician Pincode: ${currentTechnician.primaryPincode}');
-                          debugPrint('🏠 HOME PAGE - Technician Services: ${currentTechnician.specializations}');
-                          debugPrint('🏠 HOME PAGE - Technician Online: ${currentTechnician.isOnline}');
-                          
                           if (snapshot.connectionState == ConnectionState.waiting) {
                             return const Center(child: CircularProgressIndicator());
                           }
-                          
+
                           if (snapshot.hasError) {
-                            debugPrint('🏠 HOME PAGE - Error: ${snapshot.error}');
                             return Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -620,7 +551,6 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                                   const Icon(Icons.error, size: 64, color: Colors.red),
                                   const SizedBox(height: 16),
                                   Text('Error: ${snapshot.error}'),
-                                  const SizedBox(height: 16),
                                   ElevatedButton(
                                     onPressed: () => setState(() {}),
                                     child: const Text('Retry'),
@@ -629,23 +559,19 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                               ),
                             );
                           }
-                          
-                          final bookings = snapshot.data ?? [];
-                          debugPrint('🏠 HOME PAGE - Jobs Count: ${bookings.length}');
-                          
-                          if (bookings.isEmpty) {
+
+                          // Unassigned pending jobs (show Accept button)
+                          final pendingJobs = snapshot.data ?? [];
+
+                          if (pendingJobs.isEmpty) {
                             return Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(
-                                    Icons.work_off,
-                                    size: 64,
-                                    color: Colors.grey,
-                                  ),
+                                  const Icon(Icons.work_off, size: 64, color: Colors.grey),
                                   const SizedBox(height: 16),
                                   const Text(
-                                    'No jobs available',
+                                    'No new jobs available',
                                     style: TextStyle(
                                       fontSize: 16,
                                       color: Colors.grey,
@@ -655,21 +581,10 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                                   const SizedBox(height: 8),
                                   Text(
                                     'Pincode: ${currentTechnician.primaryPincode}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey,
-                                    ),
+                                    style: const TextStyle(fontSize: 13, color: Colors.grey),
                                   ),
-                                  Text(
-                                    'Services: ${currentTechnician.specializations.join(", ")}',
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.grey,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  if (!currentTechnician.isOnline)
+                                  if (!currentTechnician.isOnline) ...[
+                                    const SizedBox(height: 16),
                                     ElevatedButton(
                                       onPressed: () => _forceOnlineStatus(currentTechnician),
                                       style: ElevatedButton.styleFrom(
@@ -677,6 +592,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                                       ),
                                       child: const Text('GO ONLINE'),
                                     ),
+                                  ],
                                   const SizedBox(height: 8),
                                   OutlinedButton.icon(
                                     onPressed: () => _debugFirebaseConnection(currentTechnician),
@@ -690,17 +606,15 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                               ),
                             );
                           }
-                          
+
                           return ListView.builder(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
-                            itemCount: bookings.length,
+                            itemCount: pendingJobs.length,
                             itemBuilder: (context, index) {
-                              final booking = bookings[index];
-                              debugPrint('🏠 Displaying job: ${booking.id} - ${booking.service}');
-                              return _buildJobCard(
+                              return _buildActiveJobCard(
                                 context,
                                 currentTechnician,
-                                booking,
+                                pendingJobs[index],
                               );
                             },
                           );
@@ -713,6 +627,58 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard({
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1115,47 +1081,6 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     );
   }
 
-  Widget _buildStatCard(String value, String label, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(
-            icon,
-            size: 32,
-            color: AppColors.primary,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildJobCard(
     BuildContext context,
@@ -1342,7 +1267,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                 ),
               ],
             ),
-          ] else ...[
+          ] else ...[ 
             const SizedBox(height: 12),
             Row(
               children: [
@@ -1365,12 +1290,233 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     child: const Text('View Details →'),
                   ),
                 ),
+                if (booking.status == 'completed') ...[
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _downloadInvoice(booking, technician),
+                      icon: const Icon(Icons.workspace_premium_outlined, size: 16),
+                      label: const Text(
+                        'Certificate',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.green,
+                        side: const BorderSide(color: Colors.green),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ],
         ],
       ),
     );
+  }
+
+  /// Card for home page Recent Jobs — shows NEW unassigned jobs with Accept Job button
+  Widget _buildActiveJobCard(
+    BuildContext context,
+    TechnicianModel technician,
+    BookingModel booking,
+  ) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => JobDetailsPage(
+            bookingId: booking.id,
+            technicianId: technician.uid,
+          ),
+        ),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFF2563EB).withOpacity(0.15)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top row: name + amount
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        booking.userName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        booking.service,
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '₹${booking.totalAmount.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2563EB),
+                      ),
+                    ),
+                    Container(
+                      margin: const EdgeInsets.only(top: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'NEW',
+                        style: TextStyle(
+                          color: Colors.orange,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+            const Divider(height: 1, color: Color(0xFFEEEEEE)),
+            const SizedBox(height: 10),
+
+            // Address row
+            Row(
+              children: [
+                Icon(Icons.location_on, size: 15, color: Colors.grey[500]),
+                const SizedBox(width: 5),
+                Expanded(
+                  child: Text(
+                    booking.address ?? 'Address not available',
+                    style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+
+            // Time row
+            Row(
+              children: [
+                Icon(Icons.access_time, size: 15, color: Colors.grey[500]),
+                const SizedBox(width: 5),
+                Text(
+                  booking.scheduledTime,
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 14),
+
+            // Full-width Accept Job button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () =>
+                    _acceptBooking(booking.id, technician.uid, technician.name),
+                icon: const Icon(Icons.check_circle_outline, size: 18),
+                label: const Text(
+                  'Accept Job',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Generate Job Completion Certificate for a completed booking
+  Future<void> _downloadInvoice(BookingModel booking, TechnicianModel technician) async {
+    try {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Generating certificate...'),
+            ],
+          ),
+        ),
+      );
+
+      // Job Completion Certificate — matching the design the technician sees
+      await PDFService.printJobCompletionCertificate(
+        booking: booking,
+        technicianName: technician.name,
+        completedJobsCount: technician.completedJobs ?? 0,
+      );
+
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Certificate ready'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _acceptBooking(String bookingId, String technicianId, String technicianName) async {

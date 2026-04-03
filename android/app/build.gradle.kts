@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "com.bdr.technician"
+    namespace = "com.example.bharatapp"
     compileSdk = flutter.compileSdkVersion
 
     compileOptions {
@@ -23,7 +23,7 @@ android {
 
     defaultConfig {
         // BDR Technician App - Partner/Employee Application
-        applicationId = "com.bdr.technician"
+        applicationId = "com.example.bharatapp"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

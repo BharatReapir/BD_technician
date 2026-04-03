@@ -510,9 +510,11 @@ class FirebaseService {
     }
   }
 
-  /// Stream available bookings for technician — shows ALL bookings that:
-  /// 1. Have not been completed / cancelled / rejected
-  /// 2. Have no technician assigned yet (technicianId is null or empty)
+  /// Stream available bookings for technician — shows bookings that:
+  /// 1. Are NOT completed / cancelled / rejected / accepted / in_progress
+  /// 2. Have no technician assigned yet
+  /// 3. Were created within the last 48 hours
+  /// 4. Match the technician's pincode
   static Stream<List<BookingModel>> streamPendingBookingsForTechnician({
     required String pincode,
     required List<String> specializations,
@@ -521,29 +523,21 @@ class FirebaseService {
         .onValue
         .map((event) {
       if (!event.snapshot.exists || event.snapshot.value == null) {
-        debugPrint('📋 No bookings in database');
         return <BookingModel>[];
       }
 
       final bookingsMap =
           Map<String, dynamic>.from(event.snapshot.value as Map);
 
-      debugPrint('📋 Total bookings in DB: ${bookingsMap.length}');
-
-      // Log raw data once per update so we can diagnose
-      bookingsMap.forEach((key, value) {
-        final b = Map<String, dynamic>.from(value as Map);
-        debugPrint(
-          '  📄 $key | status="${b['status']}" | techId="${b['technicianId']}"'
-          ' | service="${b['service']}" | pincode="${b['pincode']}"',
-        );
-      });
-
       // Statuses that mean "job is done / no longer available"
       const closedStatuses = {
         'completed', 'cancelled', 'rejected', 'declined',
-        'expired', 'failed', 'refunded',
+        'expired', 'failed', 'refunded', 'accepted', 'in_progress',
       };
+
+      final cutoff = DateTime.now().subtract(const Duration(hours: 48));
+      // Normalize technician pincode for comparison
+      final techPincode = pincode.trim();
 
       final result = bookingsMap.entries
           .map((entry) {
@@ -555,26 +549,38 @@ class FirebaseService {
           .where((booking) {
             final status = booking.status.toLowerCase().trim();
 
-            // Hide jobs that are done
-            if (closedStatuses.contains(status)) {
-              debugPrint('🚫 ${booking.id}: closed status "$status"');
-              return false;
-            }
+            // 1. Hide completed / cancelled / accepted jobs
+            if (closedStatuses.contains(status)) return false;
 
-            // Hide jobs already assigned to a technician
+            // 2. Hide jobs already assigned to another technician
             final techId = (booking.technicianId ?? '').trim();
-            if (techId.isNotEmpty && techId != 'unassigned' && techId != 'none') {
-              debugPrint('🚫 ${booking.id}: already assigned to "$techId"');
-              return false;
+            if (techId.isNotEmpty &&
+                techId != 'unassigned' &&
+                techId != 'none') return false;
+
+            // 3. Hide jobs older than 48 hours
+            if (booking.createdAt.isBefore(cutoff)) return false;
+
+            // 4. ✅ PINCODE FILTER — only show jobs in this technician's area
+            if (techPincode.isNotEmpty) {
+              final bookingPincode = (booking.pincode ?? '').trim();
+              if (bookingPincode.isNotEmpty && bookingPincode != techPincode) {
+                debugPrint(
+                  '📍 Skipped ${booking.id}: pincode mismatch '
+                  '(job=$bookingPincode, tech=$techPincode)',
+                );
+                return false;
+              }
             }
 
-            debugPrint('✅ ${booking.id}: showing (status="$status", techId="$techId")');
             return true;
           })
           .toList()
         ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
-      debugPrint('📋 Jobs shown to technician: ${result.length} / ${bookingsMap.length}');
+      debugPrint(
+        '📋 Jobs available for pincode $techPincode (≤48h): ${result.length}',
+      );
       return result;
     });
   }

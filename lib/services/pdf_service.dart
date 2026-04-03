@@ -1,10 +1,8 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:path_provider/path_provider.dart';
 import '../models/booking_model.dart';
 import '../models/billing_model.dart';
 
@@ -398,19 +396,11 @@ class PDFService {
         ),
       );
       
-      if (downloadToDevice) {
-        // Save to device
-        final directory = await getApplicationDocumentsDirectory();
-        final file = File('${directory.path}/Invoice_${billing.invoiceNumber}.pdf');
-        await file.writeAsBytes(await pdf.save());
-        print('Invoice saved to: ${file.path}');
-      } else {
-        // Print/share the invoice
-        await Printing.layoutPdf(
-          onLayout: (PdfPageFormat format) async => pdf.save(),
-          name: 'Invoice_${billing.invoiceNumber}',
-        );
-      }
+      // Print/share the invoice (works on all platforms)
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: 'Invoice_${billing.invoiceNumber}',
+      );
       
     } catch (e) {
       print('Error generating GST invoice: $e');

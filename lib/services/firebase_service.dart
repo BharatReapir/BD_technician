@@ -2,6 +2,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart'; // ✅ ADD: For debugPrint
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 import '../models/user_model.dart';
 import '../models/technician_model.dart';
 import '../models/booking_model.dart';
@@ -798,6 +800,52 @@ class FirebaseService {
     }
   }
 
+  /// Upload job photo to Firebase Storage
+  static Future<String> uploadJobPhoto(File photo, String bookingId, String type) async {
+    try {
+      debugPrint('📸 Uploading $type photo for booking $bookingId');
+      final fileName = '${bookingId}_${type}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final ref = FirebaseStorage.instance.ref().child('job_photos/$bookingId/$fileName');
+      
+      final uploadTask = ref.putFile(photo);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      
+      debugPrint('✅ Photo uploaded successfully. URL: $downloadUrl');
+      return downloadUrl;
+    } catch (e) {
+      debugPrint('❌ Error uploading photo: $e');
+      rethrow;
+    }
+  }
+
+  /// Update booking with photo URLs
+  static Future<void> updateBookingPhotos({
+    required String bookingId, 
+    List<String>? beforePhotos,
+    String? afterPhoto
+  }) async {
+    try {
+      final updates = <String, dynamic>{
+        'updatedAt': DateTime.now().toIso8601String(),
+      };
+      
+      if (beforePhotos != null && beforePhotos.isNotEmpty) {
+        updates['beforePhotoUrls'] = beforePhotos;
+      }
+      
+      if (afterPhoto != null) {
+        updates['afterPhotoUrl'] = afterPhoto;
+      }
+      
+      await _realtimeDb.ref('bookings/$bookingId').update(updates);
+      debugPrint('✅ Booking photos updated successfully');
+    } catch (e) {
+      debugPrint('❌ Error updating booking photos: $e');
+      rethrow;
+    }
+  }
+
   /// Update booking payment details
   static Future<void> updateBookingPaymentId(
       String bookingId, String paymentId) async {
@@ -973,6 +1021,51 @@ class FirebaseService {
     } catch (e) {
       debugPrint('❌ Error incrementing completed jobs: $e');
       throw Exception('Failed to update technician stats: $e');
+    }
+  }
+
+  /// Submit job rating for technician
+  static Future<void> submitJobRating({
+    required String bookingId,
+    required String technicianId,
+    required double rating,
+    String? feedback,
+  }) async {
+    try {
+      debugPrint('⭐ Submitting rating $rating for technician $technicianId');
+
+      // Save rating record
+      await _realtimeDb.ref('ratings/$bookingId').set({
+        'bookingId': bookingId,
+        'technicianId': technicianId,
+        'rating': rating,
+        'feedback': feedback ?? '',
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+
+      // Recalculate technician average rating
+      final ratingsSnapshot = await _realtimeDb
+          .ref('ratings')
+          .orderByChild('technicianId')
+          .equalTo(technicianId)
+          .get();
+
+      if (ratingsSnapshot.exists && ratingsSnapshot.value != null) {
+        final ratingsMap = Map<String, dynamic>.from(ratingsSnapshot.value as Map);
+        final ratings = ratingsMap.values
+            .map((r) => _toDouble((r as Map)['rating']))
+            .toList();
+        final avgRating = ratings.reduce((a, b) => a + b) / ratings.length;
+
+        await _realtimeDb.ref('technicians/$technicianId').update({
+          'rating': double.parse(avgRating.toStringAsFixed(1)),
+          'updatedAt': DateTime.now().toIso8601String(),
+        });
+        debugPrint('✅ Technician rating updated to $avgRating');
+      }
+    } catch (e) {
+      debugPrint('❌ Error submitting rating: $e');
+      // Don't rethrow — rating failure shouldn't block the flow
     }
   }
 

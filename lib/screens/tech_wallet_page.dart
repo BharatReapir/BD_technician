@@ -57,9 +57,9 @@ class _TechWalletPageState extends State<TechWalletPage> {
 
     try {
       await TechPaymentService.verifyWalletPayment(
-        razorpayOrderId: response.orderId!,
-        razorpayPaymentId: response.paymentId!,
-        razorpaySignature: response.signature!,
+        razorpayOrderId: response.orderId ?? '',
+        razorpayPaymentId: response.paymentId ?? '',
+        razorpaySignature: response.signature ?? '',
         technicianId: widget.technicianId,
       );
 
@@ -194,14 +194,13 @@ class _TechWalletPageState extends State<TechWalletPage> {
         },
       };
 
-      debugPrint('🚀 Opening Razorpay with options: $options');
+      if (mounted) {
+        Navigator.pop(context); // Close dialog first
+      }
 
+      debugPrint('🚀 Opening Razorpay with options: $options');
       _razorpay.open(options);
       _amountController.clear();
-      
-      if (mounted) {
-        Navigator.pop(context); // Close dialog
-      }
 
       setState(() {
         _isLoading = false;

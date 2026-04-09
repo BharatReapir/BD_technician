@@ -12,10 +12,12 @@ import '../providers/auth_provider.dart';
 
 class CompleteJobPage extends StatefulWidget {
   final BookingModel booking;
+  final List<File>? beforePhotos;
 
   const CompleteJobPage({
     Key? key,
     required this.booking,
+    this.beforePhotos,
   }) : super(key: key);
 
   @override
@@ -115,6 +117,7 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
     );
   }
 
+
   Future<void> _generateInvoice() async {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -169,12 +172,57 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
       return;
     }
 
+    if (_afterPhoto == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please upload an after photo'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final technician = authProvider.technician;
       if (technician == null) throw Exception('Technician not found');
+
+      // Upload photos to Firebase Storage
+      List<String> beforePhotoUrls = [];
+      String? afterPhotoUrl;
+
+      try {
+        if (widget.beforePhotos != null && widget.beforePhotos!.isNotEmpty) {
+          for (int i = 0; i < widget.beforePhotos!.length; i++) {
+            final url = await FirebaseService.uploadJobPhoto(
+              widget.beforePhotos![i], 
+              widget.booking.id, 
+              'before_$i'
+            );
+            beforePhotoUrls.add(url);
+          }
+        }
+
+        if (_afterPhoto != null) {
+          afterPhotoUrl = await FirebaseService.uploadJobPhoto(
+            _afterPhoto!, 
+            widget.booking.id, 
+            'after'
+          );
+        }
+
+        // Update photo URLs in booking
+        await FirebaseService.updateBookingPhotos(
+          bookingId: widget.booking.id,
+          beforePhotos: beforePhotoUrls,
+          afterPhoto: afterPhotoUrl,
+        );
+      } catch (e) {
+        debugPrint('⚠️ Error uploading photos, but continuing job completion: $e');
+        // We still continue to complete the job even if photo upload fails
+      }
 
       // Complete the job
       await FirebaseService.completeJobAndClearTechnician(

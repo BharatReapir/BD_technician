@@ -70,6 +70,9 @@ class BDRTechnicianApp extends StatelessWidget {
             foregroundColor: Colors.white,
             elevation: 0,
           ),
+          textTheme: const TextTheme().apply(
+            fontFamilyFallback: ['Noto Sans', 'sans-serif'],
+          ),
         ),
         home: const TechnicianAuthChecker(),
       ),

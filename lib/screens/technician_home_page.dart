@@ -17,6 +17,7 @@ import '../utils/commission_calculator.dart';
 import 'tech_wallet_page.dart';
 import 'job_details_page.dart';
 import 'technician_login_page.dart';
+import '../widgets/rupee_text.dart';
 
 class TechnicianHomePage extends StatefulWidget {
   const TechnicianHomePage({Key? key}) : super(key: key);
@@ -60,10 +61,15 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                 currentPage = _buildJobsPage(currentTechnician);
                 break;
               case 2:
-                currentPage = TechWalletPage(technicianId: currentTechnician.uid);
+                currentPage = TechWalletPage(
+                  technicianId: currentTechnician.uid,
+                );
                 break;
               case 3:
-                currentPage = _buildProfilePage(currentTechnician, authProvider);
+                currentPage = _buildProfilePage(
+                  currentTechnician,
+                  authProvider,
+                );
                 break;
               default:
                 currentPage = _buildHomePage(currentTechnician, authProvider);
@@ -78,7 +84,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       },
     );
   }
-  
+
   Widget _buildJobsPage(TechnicianModel technician) {
     return Container(
       color: const Color(0xFFF5F5F5),
@@ -144,7 +150,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       ),
     );
   }
-  
+
   Widget _buildAllJobsList(TechnicianModel technician) {
     return StreamBuilder<List<BookingModel>>(
       stream: FirebaseService.streamTechnicianBookings(technician.uid),
@@ -152,13 +158,13 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         final bookings = snapshot.data ?? [];
-        
+
         if (bookings.isEmpty) {
           return const Center(child: Text('No jobs yet'));
         }
-        
+
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: bookings.length,
@@ -169,7 +175,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       },
     );
   }
-  
+
   Widget _buildPendingJobsList(TechnicianModel technician) {
     return StreamBuilder<List<BookingModel>>(
       stream: FirebaseService.streamPendingBookingsForTechnician(
@@ -180,13 +186,13 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         final bookings = snapshot.data ?? [];
-        
+
         if (bookings.isEmpty) {
           return const Center(child: Text('No pending jobs'));
         }
-        
+
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: bookings.length,
@@ -197,7 +203,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       },
     );
   }
-  
+
   Widget _buildActiveJobsList(TechnicianModel technician) {
     return StreamBuilder<List<BookingModel>>(
       stream: FirebaseService.streamTechnicianBookings(technician.uid),
@@ -205,16 +211,16 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         final allBookings = snapshot.data ?? [];
-        final activeBookings = allBookings.where((b) => 
-          b.status == 'accepted' || b.status == 'in_progress'
-        ).toList();
-        
+        final activeBookings = allBookings
+            .where((b) => b.status == 'accepted' || b.status == 'in_progress')
+            .toList();
+
         if (activeBookings.isEmpty) {
           return const Center(child: Text('No active jobs'));
         }
-        
+
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: activeBookings.length,
@@ -225,7 +231,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       },
     );
   }
-  
+
   Widget _buildCompletedJobsList(TechnicianModel technician) {
     return StreamBuilder<List<BookingModel>>(
       stream: FirebaseService.streamTechnicianBookings(technician.uid),
@@ -233,16 +239,16 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        
+
         final allBookings = snapshot.data ?? [];
-        final completedBookings = allBookings.where((b) => 
-          b.status == 'completed'
-        ).toList();
-        
+        final completedBookings = allBookings
+            .where((b) => b.status == 'completed')
+            .toList();
+
         if (completedBookings.isEmpty) {
           return const Center(child: Text('No completed jobs'));
         }
-        
+
         return ListView.builder(
           padding: const EdgeInsets.all(16),
           itemCount: completedBookings.length,
@@ -292,7 +298,10 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     );
   }
 
-  Widget _buildHomePage(TechnicianModel currentTechnician, AuthProvider authProvider) {
+  Widget _buildHomePage(
+    TechnicianModel currentTechnician,
+    AuthProvider authProvider,
+  ) {
     return Container(
       color: const Color(0xFF2563EB), // Blue background
       child: SafeArea(
@@ -307,7 +316,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     radius: 28,
                     backgroundColor: Colors.white,
                     child: Text(
-                      currentTechnician.name.isNotEmpty 
+                      currentTechnician.name.isNotEmpty
                           ? currentTechnician.name[0].toUpperCase()
                           : 'T',
                       style: const TextStyle(
@@ -332,7 +341,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                         ),
                         Row(
                           children: [
-                            const Icon(Icons.star, color: Colors.amber, size: 16),
+                            const Icon(
+                              Icons.star,
+                              color: Colors.amber,
+                              size: 16,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               currentTechnician.rating.toStringAsFixed(1),
@@ -408,17 +421,24 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                       );
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.2),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.account_balance_wallet, color: Colors.white, size: 20),
+                          const Icon(
+                            Icons.account_balance_wallet,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                           const SizedBox(width: 6),
                           Text(
-                            '₹${currentTechnician.walletBalance.toStringAsFixed(0)}',
+                            '?${currentTechnician.walletBalance.toStringAsFixed(0)}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -432,7 +452,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                 ],
               ),
             ),
-            
+
             // Online status toggle
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -449,7 +469,9 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            currentTechnician.isOnline ? "You're Online" : "You're Offline",
+                            currentTechnician.isOnline
+                                ? "You're Online"
+                                : "You're Offline",
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -457,7 +479,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                             ),
                           ),
                           Text(
-                            currentTechnician.isOnline 
+                            currentTechnician.isOnline
                                 ? 'Ready to accept bookings'
                                 : 'Turn on to receive bookings',
                             style: TextStyle(
@@ -470,44 +492,66 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     ),
                     Switch(
                       value: currentTechnician.isOnline,
-                      onChanged: (value) => _toggleOnlineStatus(currentTechnician),
+                      onChanged: (value) =>
+                          _toggleOnlineStatus(currentTechnician),
                       activeColor: Colors.green,
                     ),
                   ],
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 20),
-            
+
             // Stats cards — real-time from Firebase
             StreamBuilder<List<BookingModel>>(
-              stream: FirebaseService.streamTechnicianBookings(currentTechnician.uid),
+              stream: FirebaseService.streamTechnicianBookings(
+                currentTechnician.uid,
+              ),
               builder: (context, statsSnapshot) {
                 final allBookings = statsSnapshot.data ?? [];
                 final now = DateTime.now();
-                final todayJobs = allBookings.where((b) =>
-                  b.createdAt.year == now.year &&
-                  b.createdAt.month == now.month &&
-                  b.createdAt.day == now.day,
-                ).length;
-                final completedJobs = allBookings.where((b) => b.status == 'completed').length;
+                final todayJobs = allBookings
+                    .where(
+                      (b) =>
+                          b.createdAt.year == now.year &&
+                          b.createdAt.month == now.month &&
+                          b.createdAt.day == now.day,
+                    )
+                    .length;
+                final completedJobs = allBookings
+                    .where((b) => b.status == 'completed')
+                    .length;
 
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20.0),
                   child: Row(
                     children: [
-                      Expanded(child: _buildStatCard(label: "Today's Jobs", value: '$todayJobs', icon: Icons.today_rounded, color: const Color(0xFF2563EB))),
+                      Expanded(
+                        child: _buildStatCard(
+                          label: "Today's Jobs",
+                          value: '$todayJobs',
+                          icon: Icons.today_rounded,
+                          color: const Color(0xFF2563EB),
+                        ),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: _buildStatCard(label: 'Completed', value: '$completedJobs', icon: Icons.check_circle_outline_rounded, color: Colors.green)),
+                      Expanded(
+                        child: _buildStatCard(
+                          label: 'Completed',
+                          value: '$completedJobs',
+                          icon: Icons.check_circle_outline_rounded,
+                          color: Colors.green,
+                        ),
+                      ),
                     ],
                   ),
                 );
               },
             ),
-            
+
             const SizedBox(height: 20),
-            
+
             // Recent Jobs — shows active jobs + unassigned pending
             Expanded(
               child: Container(
@@ -534,13 +578,18 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     ),
                     Expanded(
                       child: StreamBuilder<List<BookingModel>>(
-                        stream: FirebaseService.streamPendingBookingsForTechnician(
-                          pincode: currentTechnician.primaryPincode,
-                          specializations: currentTechnician.specializations,
-                        ),
+                        stream:
+                            FirebaseService.streamPendingBookingsForTechnician(
+                              pincode: currentTechnician.primaryPincode,
+                              specializations:
+                                  currentTechnician.specializations,
+                            ),
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator());
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
                           }
 
                           if (snapshot.hasError) {
@@ -548,7 +597,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.error, size: 64, color: Colors.red),
+                                  const Icon(
+                                    Icons.error,
+                                    size: 64,
+                                    color: Colors.red,
+                                  ),
                                   const SizedBox(height: 16),
                                   Text('Error: ${snapshot.error}'),
                                   ElevatedButton(
@@ -568,7 +621,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(Icons.work_off, size: 64, color: Colors.grey),
+                                  const Icon(
+                                    Icons.work_off,
+                                    size: 64,
+                                    color: Colors.grey,
+                                  ),
                                   const SizedBox(height: 16),
                                   const Text(
                                     'No new jobs available',
@@ -581,27 +638,22 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                                   const SizedBox(height: 8),
                                   Text(
                                     'Pincode: ${currentTechnician.primaryPincode}',
-                                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey,
+                                    ),
                                   ),
                                   if (!currentTechnician.isOnline) ...[
                                     const SizedBox(height: 16),
                                     ElevatedButton(
-                                      onPressed: () => _forceOnlineStatus(currentTechnician),
+                                      onPressed: () =>
+                                          _forceOnlineStatus(currentTechnician),
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: Colors.green,
                                       ),
                                       child: const Text('GO ONLINE'),
                                     ),
                                   ],
-                                  const SizedBox(height: 8),
-                                  OutlinedButton.icon(
-                                    onPressed: () => _debugFirebaseConnection(currentTechnician),
-                                    icon: const Icon(Icons.bug_report, size: 18),
-                                    label: const Text('Debug Connection'),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: Colors.orange,
-                                    ),
-                                  ),
                                 ],
                               ),
                             );
@@ -683,7 +735,10 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     );
   }
 
-  Widget _buildProfilePage(TechnicianModel currentTechnician, AuthProvider authProvider) {
+  Widget _buildProfilePage(
+    TechnicianModel currentTechnician,
+    AuthProvider authProvider,
+  ) {
     return Container(
       color: Colors.white,
       child: SafeArea(
@@ -706,8 +761,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   const Spacer(),
                   TextButton.icon(
                     onPressed: () => _showEditProfileSheet(currentTechnician),
-                    icon: const Icon(Icons.edit_outlined, size: 18,
-                        color: Color(0xFF2563EB)),
+                    icon: const Icon(
+                      Icons.edit_outlined,
+                      size: 18,
+                      color: Color(0xFF2563EB),
+                    ),
                     label: const Text(
                       'Edit',
                       style: TextStyle(
@@ -720,7 +778,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                 ],
               ),
             ),
-            
+
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
@@ -744,9 +802,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                         children: [
                           CircleAvatar(
                             radius: 50,
-                            backgroundColor: const Color(0xFF2563EB).withOpacity(0.1),
+                            backgroundColor: const Color(
+                              0xFF2563EB,
+                            ).withOpacity(0.1),
                             child: Text(
-                              currentTechnician.name.isNotEmpty 
+                              currentTechnician.name.isNotEmpty
                                   ? currentTechnician.name[0].toUpperCase()
                                   : 'T',
                               style: const TextStyle(
@@ -777,7 +837,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.star, color: Colors.amber, size: 20),
+                              const Icon(
+                                Icons.star,
+                                color: Colors.amber,
+                                size: 20,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 currentTechnician.rating.toStringAsFixed(1),
@@ -792,9 +856,9 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Professional Information
                     Container(
                       padding: const EdgeInsets.all(20),
@@ -814,7 +878,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.work, color: Color(0xFF2563EB), size: 20),
+                              const Icon(
+                                Icons.work,
+                                color: Color(0xFF2563EB),
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               const Text(
                                 'Professional Information',
@@ -827,15 +895,18 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                             ],
                           ),
                           const SizedBox(height: 16),
-                          _buildInfoRow2('Service Category', currentTechnician.specializations.join(', ')),
+                          _buildInfoRow2(
+                            'Service Category',
+                            currentTechnician.specializations.join(', '),
+                          ),
                           const SizedBox(height: 12),
                           _buildInfoRow2('Experience', '5 years'),
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // Working Areas
                     Container(
                       padding: const EdgeInsets.all(20),
@@ -855,7 +926,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.location_on, color: Color(0xFF2563EB), size: 20),
+                              const Icon(
+                                Icons.location_on,
+                                color: Color(0xFF2563EB),
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               const Text(
                                 'Working Areas',
@@ -873,15 +948,17 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                             runSpacing: 8,
                             children: [
                               _buildAreaChip(currentTechnician.city),
-                              _buildAreaChip('Pincode: ${currentTechnician.primaryPincode}'),
+                              _buildAreaChip(
+                                'Pincode: ${currentTechnician.primaryPincode}',
+                              ),
                             ],
                           ),
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // KYC Documents with real Upload buttons
                     Container(
                       padding: const EdgeInsets.all(20),
@@ -901,8 +978,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.verified_user,
-                                  color: Color(0xFF2563EB), size: 20),
+                              const Icon(
+                                Icons.verified_user,
+                                color: Color(0xFF2563EB),
+                                size: 20,
+                              ),
                               const SizedBox(width: 8),
                               const Text(
                                 'KYC Documents',
@@ -919,19 +999,148 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                             label: 'Aadhaar Card',
                             technicianId: currentTechnician.uid,
                             kycType: 'aadhaar',
-                            isUploaded: (currentTechnician.kycDocuments?['aadhaar'] != null),
+                            isUploaded:
+                                (currentTechnician.kycDocuments?['aadhaar'] !=
+                                null),
                           ),
                           const SizedBox(height: 12),
                           _buildKycRow(
                             label: 'PAN Card',
                             technicianId: currentTechnician.uid,
                             kycType: 'pan',
-                            isUploaded: (currentTechnician.kycDocuments?['pan'] != null),
+                            isUploaded:
+                                (currentTechnician.kycDocuments?['pan'] !=
+                                null),
                           ),
                         ],
                       ),
                     ),
-                    
+
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.account_balance,
+                                color: Color(0xFF2563EB),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                "Banking Details",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const Spacer(),
+                              TextButton(
+                                onPressed: () {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        "Bank Details update coming soon",
+                                      ),
+                                    ),
+                                  );
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(50, 30),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  currentTechnician.bankDetails == null
+                                      ? "Add"
+                                      : "Edit",
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF2563EB),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          if (currentTechnician.bankDetails != null) ...[
+                            _buildInfoRow2(
+                              "Account Holder",
+                              currentTechnician
+                                      .bankDetails!["accountHolderName"] ??
+                                  "N/A",
+                            ),
+                            const SizedBox(height: 12),
+                            _buildInfoRow2(
+                              "Bank Name",
+                              currentTechnician.bankDetails!["bankName"] ??
+                                  "N/A",
+                            ),
+                            const SizedBox(height: 12),
+                            _buildInfoRow2(
+                              "Account Number",
+                              currentTechnician.bankDetails!["accountNumber"] ??
+                                  "N/A",
+                            ),
+                            const SizedBox(height: 12),
+                            _buildInfoRow2(
+                              "IFSC Code",
+                              currentTechnician.bankDetails!["ifscCode"] ??
+                                  "N/A",
+                            ),
+                          ] else ...[
+                            Text(
+                              "Please add your banking details to receive daily payouts.",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _showLogoutDialog(authProvider),
+                        icon: const Icon(Icons.logout, size: 20),
+                        label: const Text(
+                          "Logout",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.red,
+                          side: const BorderSide(color: Colors.red, width: 1.5),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -942,18 +1151,12 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       ),
     );
   }
-  
+
   Widget _buildInfoRow2(String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey[600],
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: 13, color: Colors.grey[600])),
         const SizedBox(height: 4),
         Text(
           value,
@@ -966,7 +1169,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       ],
     );
   }
-  
+
   Widget _buildAreaChip(String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -976,10 +1179,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          fontSize: 13,
-          color: Colors.black87,
-        ),
+        style: const TextStyle(fontSize: 13, color: Colors.black87),
       ),
     );
   }
@@ -999,11 +1199,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       ),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: AppColors.primary,
-            size: 24,
-          ),
+          Icon(icon, color: AppColors.primary, size: 24),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -1049,22 +1245,23 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
             ElevatedButton(
               onPressed: () async {
                 Navigator.of(context).pop();
-                
+
                 showDialog(
                   context: context,
                   barrierDismissible: false,
-                  builder: (context) => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
+                  builder: (context) =>
+                      const Center(child: CircularProgressIndicator()),
                 );
-                
+
                 await authProvider.logout();
-                
+
                 if (mounted) {
                   Navigator.of(context).pop();
                   Navigator.pushAndRemoveUntil(
                     context,
-                    MaterialPageRoute(builder: (context) => const TechnicianLoginPage()),
+                    MaterialPageRoute(
+                      builder: (context) => const TechnicianLoginPage(),
+                    ),
                     (route) => false,
                   );
                 }
@@ -1081,18 +1278,19 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     );
   }
 
-
   Widget _buildJobCard(
     BuildContext context,
     TechnicianModel technician,
     BookingModel booking,
   ) {
-    final calculatedEarnings = CommissionCalculator.getTechnicianEarnings(booking.totalAmount);
-    
+    final calculatedEarnings = CommissionCalculator.getTechnicianEarnings(
+      booking.totalAmount,
+    );
+
     // Determine status color and text
     Color statusColor = Colors.green;
     String statusText = 'completed';
-    
+
     if (booking.status == 'pending') {
       statusColor = Colors.orange;
       statusText = 'pending';
@@ -1100,7 +1298,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       statusColor = Colors.orange;
       statusText = 'in-progress';
     }
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -1136,10 +1334,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     const SizedBox(height: 4),
                     Text(
                       booking.service,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     ),
                   ],
                 ),
@@ -1148,7 +1343,10 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: statusColor.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
@@ -1164,7 +1362,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '₹${booking.totalAmount.toStringAsFixed(0)}',
+                    '?${booking.totalAmount.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -1173,10 +1371,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   ),
                   Text(
                     '${(booking.address?.split(',').last.trim() ?? '').replaceAll(RegExp(r'[^0-9.]'), '')} km',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -1190,10 +1385,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
               Expanded(
                 child: Text(
                   booking.address ?? 'Address not available',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1207,10 +1399,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
               const SizedBox(width: 4),
               Text(
                 booking.scheduledTime,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[600],
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
               ),
             ],
           ),
@@ -1242,14 +1431,21 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     ),
                     child: const Text(
                       'View Details',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _acceptBooking(booking.id, technician.uid, technician.name),
+                    onPressed: () => _acceptBooking(
+                      booking.id,
+                      technician.uid,
+                      technician.name,
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       foregroundColor: Colors.white,
@@ -1261,13 +1457,16 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     ),
                     child: const Text(
                       'Accept Job',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
               ],
             ),
-          ] else ...[ 
+          ] else ...[
             const SizedBox(height: 12),
             Row(
               children: [
@@ -1295,7 +1494,10 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: () => _downloadInvoice(booking, technician),
-                      icon: const Icon(Icons.workspace_premium_outlined, size: 16),
+                      icon: const Icon(
+                        Icons.workspace_premium_outlined,
+                        size: 16,
+                      ),
                       label: const Text(
                         'Certificate',
                         style: TextStyle(fontSize: 13),
@@ -1381,7 +1583,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '₹${booking.totalAmount.toStringAsFixed(0)}',
+                      '?${booking.totalAmount.toStringAsFixed(0)}',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -1390,7 +1592,10 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                     ),
                     Container(
                       margin: const EdgeInsets.only(top: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.orange.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(8),
@@ -1445,12 +1650,12 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
 
             const SizedBox(height: 14),
 
-            // Full-width Accept Job button
+            // Full-width Accept Job button — shows user details sheet first
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () =>
-                    _acceptBooking(booking.id, technician.uid, technician.name),
+                    _showJobAcceptSheet(context, technician, booking),
                 icon: const Icon(Icons.check_circle_outline, size: 18),
                 label: const Text(
                   'Accept Job',
@@ -1473,8 +1678,355 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     );
   }
 
+  /// Shows a bottom sheet with full customer details + map before accepting
+  void _showJobAcceptSheet(
+    BuildContext context,
+    TechnicianModel technician,
+    BookingModel booking,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (ctx, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                child: Row(
+                  children: [
+                    const Text(
+                      'New Service Request',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Customer name + service
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  booking.userName,
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  booking.service,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          // Call button
+                          GestureDetector(
+                            onTap: () {
+                              // TODO: launch phone call
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade300),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.phone_outlined,
+                                size: 22,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Location + time card
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  color: Color(0xFF2563EB),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    booking.address ?? 'Address not available',
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            // Map placeholder — opens Google Maps on tap
+                            GestureDetector(
+                              onTap: () {
+                                final address = Uri.encodeComponent(
+                                  booking.address ?? '',
+                                );
+                                // Opens Google Maps with the address
+                                // url_launcher would be used here
+                              },
+                              child: Container(
+                                height: 140,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    // Map grid lines to simulate map
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(10),
+                                      child: CustomPaint(
+                                        size: const Size(double.infinity, 140),
+                                        painter: _MapGridPainter(),
+                                      ),
+                                    ),
+                                    // Pin icon in center
+                                    const Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.location_pin,
+                                            color: Colors.red,
+                                            size: 36,
+                                          ),
+                                          SizedBox(height: 4),
+                                          Text(
+                                            'Tap to open in Maps',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black54,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.access_time,
+                                  color: Color(0xFF2563EB),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  booking.scheduledTime,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Problem description
+                      if (booking.notes != null &&
+                          booking.notes!.isNotEmpty) ...[
+                        const Text(
+                          'Problem Description',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.black54,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          booking.notes!,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Estimated earnings
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.green.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Estimated Earnings',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.black54,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '?${CommissionCalculator.getTechnicianEarnings(booking.totalAmount).toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Reject + Accept buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.red,
+                                side: const BorderSide(color: Colors.red),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Reject',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _acceptBooking(
+                                  booking.id,
+                                  technician.uid,
+                                  technician.name,
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 0,
+                              ),
+                              child: const Text(
+                                'Accept',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Generate Job Completion Certificate for a completed booking
-  Future<void> _downloadInvoice(BookingModel booking, TechnicianModel technician) async {
+  Future<void> _downloadInvoice(
+    BookingModel booking,
+    TechnicianModel technician,
+  ) async {
     try {
       showDialog(
         context: context,
@@ -1510,22 +2062,23 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       if (mounted) Navigator.of(context).pop();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('❌ Error: $e'), backgroundColor: Colors.red),
         );
       }
     }
   }
 
-  Future<void> _acceptBooking(String bookingId, String technicianId, String technicianName) async {
+  Future<void> _acceptBooking(
+    String bookingId,
+    String technicianId,
+    String technicianName,
+  ) async {
     try {
       debugPrint('🟢 Technician accepting booking: $bookingId');
-      
+
       // Store context reference
       final context = this.context;
-      
+
       // Show loading
       showDialog(
         context: context,
@@ -1540,13 +2093,13 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
           ),
         ),
       );
-      
+
       // Accept the booking (includes wallet deduction)
       await FirebaseService.acceptBooking(bookingId, technicianId);
-      
+
       // Close loading
       if (mounted) Navigator.of(context).pop();
-      
+
       // Show success message with wallet deduction info
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1557,7 +2110,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '✅ Job accepted! ₹199 deducted from wallet. Navigating to job details...',
+                    '✅ Job accepted! ?199 deducted from wallet. Navigating to job details...',
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
@@ -1572,9 +2125,8 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => TechWalletPage(
-                      technicianId: technicianId,
-                    ),
+                    builder: (context) =>
+                        TechWalletPage(technicianId: technicianId),
                   ),
                 );
               },
@@ -1582,10 +2134,10 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
           ),
         );
       }
-      
+
       // Wait a moment for Firebase to sync, then navigate
       await Future.delayed(const Duration(milliseconds: 1500));
-      
+
       // Navigate to job details page immediately
       if (mounted) {
         Navigator.push(
@@ -1598,26 +2150,29 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
           ),
         );
       }
-      
+
       debugPrint('✅ Booking accepted successfully');
     } catch (e) {
       // Close loading
       if (mounted) Navigator.of(context).pop();
-      
+
       debugPrint('❌ Error accepting booking: $e');
-      
+
       // Handle specific error cases
       if (e.toString().contains('Insufficient wallet balance')) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('❌ Insufficient wallet balance! Need ₹199 to accept job'),
+              content: Text(
+                '❌ Insufficient wallet balance! Need ?199 to accept job',
+              ),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 3),
             ),
           );
         }
-      } else if (e.toString().contains('permission') || e.toString().contains('PERMISSION_DENIED')) {
+      } else if (e.toString().contains('permission') ||
+          e.toString().contains('PERMISSION_DENIED')) {
         // Still navigate to job details even if update failed
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1626,10 +2181,10 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
               backgroundColor: Colors.orange,
             ),
           );
-          
+
           // Wait a moment then navigate
           await Future.delayed(const Duration(milliseconds: 1000));
-          
+
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -1658,7 +2213,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
   Future<void> _toggleOnlineStatus(TechnicianModel technician) async {
     try {
       final newStatus = !technician.isOnline;
-      
+
       // Show loading
       showDialog(
         context: context,
@@ -1673,34 +2228,35 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
           ),
         ),
       );
-      
+
       // Update status in Firebase
       await FirebaseService.updateTechnicianStatus(technician.uid, newStatus);
-      
+
       // Update the auth provider
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.refreshTechnicianData();
-      
+
       // Close loading
       if (mounted) Navigator.of(context).pop();
-      
+
       // Show success message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(newStatus 
-                ? 'You are now ONLINE! You will receive job notifications.' 
-                : 'You are now OFFLINE. You will not receive job notifications.'),
+            content: Text(
+              newStatus
+                  ? 'You are now ONLINE! You will receive job notifications.'
+                  : 'You are now OFFLINE. You will not receive job notifications.',
+            ),
             backgroundColor: newStatus ? Colors.green : Colors.orange,
             duration: const Duration(seconds: 3),
           ),
         );
       }
-      
     } catch (e) {
       // Close loading
       if (mounted) Navigator.of(context).pop();
-      
+
       // Show error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1730,32 +2286,33 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
           ),
         ),
       );
-      
+
       // Force update to ONLINE in Firebase
       await FirebaseService.updateTechnicianStatus(technician.uid, true);
-      
+
       // Also update the auth provider
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.refreshTechnicianData();
-      
+
       // Close loading
       if (mounted) Navigator.of(context).pop();
-      
+
       // Show success message
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('You are now ONLINE! You will receive job notifications.'),
+            content: Text(
+              'You are now ONLINE! You will receive job notifications.',
+            ),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 3),
           ),
         );
       }
-      
     } catch (e) {
       // Close loading
       if (mounted) Navigator.of(context).pop();
-      
+
       // Show error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1797,7 +2354,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.notifications, color: Colors.white, size: 24),
+                  const Icon(
+                    Icons.notifications,
+                    color: Colors.white,
+                    size: 24,
+                  ),
                   const SizedBox(width: 12),
                   const Text(
                     'Job Notifications',
@@ -1842,19 +2403,20 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.notifications_off,
-                              size: 64, color: Colors.grey),
+                          const Icon(
+                            Icons.notifications_off,
+                            size: 64,
+                            color: Colors.grey,
+                          ),
                           const SizedBox(height: 16),
                           const Text(
                             'No job alerts yet',
-                            style: TextStyle(
-                                fontSize: 16, color: Colors.grey),
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
                           ),
                           const SizedBox(height: 8),
                           const Text(
                             'You\'ll receive alerts when new jobs\nare available in your area',
-                            style: TextStyle(
-                                fontSize: 14, color: Colors.grey),
+                            style: TextStyle(fontSize: 14, color: Colors.grey),
                             textAlign: TextAlign.center,
                           ),
                         ],
@@ -1875,27 +2437,23 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                         ),
                         child: ListTile(
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
                           leading: CircleAvatar(
-                            backgroundColor:
-                                Colors.green.withOpacity(0.15),
-                            child: const Icon(
-                              Icons.work,
-                              color: Colors.green,
-                            ),
+                            backgroundColor: Colors.green.withOpacity(0.15),
+                            child: const Icon(Icons.work, color: Colors.green),
                           ),
                           title: Text(
                             notification['title'] ?? 'New Job Alert',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600),
+                            style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 2),
                               Text(notification['body'] ?? ''),
-                              if (notification['customerName'] !=
-                                  null) ...[  
+                              if (notification['customerName'] != null) ...[
                                 const SizedBox(height: 3),
                                 Text(
                                   'Customer: ${notification['customerName']}',
@@ -1908,10 +2466,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                             ],
                           ),
                           trailing: Text(
-                            _formatNotificationTime(
-                                notification['timestamp']),
+                            _formatNotificationTime(notification['timestamp']),
                             style: const TextStyle(
-                                fontSize: 11, color: Colors.grey),
+                              fontSize: 11,
+                              color: Colors.grey,
+                            ),
                           ),
                           onTap: () {
                             if (notification['bookingId'] != null) {
@@ -1939,167 +2498,6 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       ),
     );
   }
-
-  /// Test notifications functionality
-  Future<void> _testNotifications() async {
-    try {
-      debugPrint('🧪 Testing notifications...');
-      
-      // Show loading
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sending test notifications...'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      
-      // Test complete notification flow
-      await FCMService.testCompleteNotificationFlow();
-      
-      // Show success
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Test notifications sent! Check notification panel.'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
-        ),
-      );
-      
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('❌ Test failed: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-  
-  /// Debug Firebase connection and job data
-  Future<void> _debugFirebaseConnection(TechnicianModel technician) async {
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Text('Reading Firebase...'),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      final database = FirebaseDatabase.instanceFor(
-        app: Firebase.app(),
-        databaseURL:
-            'https://bharat-doorstep-native-default-rtdb.asia-southeast1.firebasedatabase.app/',
-      );
-
-      final snapshot = await database.ref('bookings').get();
-      if (mounted) Navigator.of(context).pop();
-
-      if (!snapshot.exists || snapshot.value == null) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Firebase Debug'),
-              content: const Text('⚠️ No bookings found in database at all.\n\nMake sure the user app is saving bookings to the same Firebase project.'),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK')),
-              ],
-            ),
-          );
-        }
-        return;
-      }
-
-      final bookingsMap = Map<String, dynamic>.from(snapshot.value as Map);
-      final bookingsList = bookingsMap.entries.map((e) {
-        final data = Map<String, dynamic>.from(e.value as Map);
-        return {
-          'id': e.key.substring(0, 8),
-          'status': data['status'] ?? '?',
-          'pincode': data['pincode'] ?? 'none',
-          'service': data['service'] ?? '?',
-          'techId': (data['technicianId'] ?? '').toString().isEmpty ? 'none' : 'assigned',
-        };
-      }).toList();
-
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Firebase Bookings (${bookingsList.length} total)'),
-            content: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Your pincode: ${technician.primaryPincode}\n'
-                    'Your services: ${technician.specializations.join(", ")}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      color: Colors.blue,
-                    ),
-                  ),
-                  const Divider(),
-                  ...bookingsList.map((b) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: Colors.grey.shade300),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('ID: ${b['id']}...', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                          Text('Status: ${b['status']}', style: TextStyle(
-                            fontSize: 12,
-                            color: b['status'] == 'pending' ? Colors.green
-                              : b['status'] == 'confirmed' ? Colors.orange
-                              : Colors.red,
-                            fontWeight: FontWeight.w600,
-                          )),
-                          Text('Pincode: ${b['pincode']}', style: const TextStyle(fontSize: 12)),
-                          Text('Service: ${b['service']}', style: const TextStyle(fontSize: 12)),
-                          Text('Assigned: ${b['techId']}', style: const TextStyle(fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                  )),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) Navigator.of(context).pop();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Debug failed: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
 
   // ===== EDIT PROFILE =====
 
@@ -2198,8 +2596,10 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
 
                       // Refresh technician data
                       if (mounted) {
-                        final authProvider =
-                            Provider.of<AuthProvider>(context, listen: false);
+                        final authProvider = Provider.of<AuthProvider>(
+                          context,
+                          listen: false,
+                        );
                         await authProvider.refreshTechnicianData();
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -2230,10 +2630,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   ),
                   child: const Text(
                     'Save Changes',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -2270,10 +2667,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                 children: [
                   Text(
                     label,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.black87,
-                    ),
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
                   ),
                   if (isUploaded)
                     const Text(
@@ -2287,10 +2681,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   else
                     const Text(
                       'Not uploaded',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey,
-                      ),
+                      style: TextStyle(fontSize: 11, color: Colors.grey),
                     ),
                 ],
               ),
@@ -2299,9 +2690,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
         ),
         TextButton(
           onPressed: () => _uploadKYCDocument(technicianId, kycType),
-          style: TextButton.styleFrom(
-            foregroundColor: const Color(0xFF2563EB),
-          ),
+          style: TextButton.styleFrom(foregroundColor: const Color(0xFF2563EB)),
           child: Text(isUploaded ? 'Re-upload' : 'Upload'),
         ),
       ],
@@ -2336,7 +2725,10 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Color(0xFF2563EB)),
+              leading: const Icon(
+                Icons.photo_library,
+                color: Color(0xFF2563EB),
+              ),
               title: const Text('Choose from Gallery'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
@@ -2417,11 +2809,11 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
 
   String _formatNotificationTime(dynamic timestamp) {
     if (timestamp == null) return 'Now';
-    
+
     try {
       final DateTime time = DateTime.parse(timestamp.toString());
       final Duration diff = DateTime.now().difference(time);
-      
+
       if (diff.inMinutes < 1) return 'Now';
       if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
       if (diff.inHours < 24) return '${diff.inHours}h ago';
@@ -2430,5 +2822,49 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
       return 'Now';
     }
   }
+}
 
+/// Simple map grid painter to simulate a map background
+class _MapGridPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFD0E8FF)
+      ..strokeWidth = 1;
+
+    // Background
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..color = const Color(0xFFE8F4FD),
+    );
+
+    // Horizontal lines
+    for (double y = 0; y < size.height; y += 20) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+    // Vertical lines
+    for (double x = 0; x < size.width; x += 20) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+
+    // Draw a couple of "road" lines
+    final roadPaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 6
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(
+      Offset(0, size.height * 0.4),
+      Offset(size.width, size.height * 0.4),
+      roadPaint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.35, 0),
+      Offset(size.width * 0.35, size.height),
+      roadPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -156,7 +156,7 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Complete Job?'),
-        content: const Text('Are you sure you want to complete this job?'),
+        content: const Text('Are you sure you want to complete this job? Make sure you have uploaded all before photos.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -284,18 +284,14 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
       // Close loading
       if (mounted) Navigator.of(context).pop();
       
-      // Navigate back to technician home properly - pop all the way back
+      // Navigate home
       if (mounted) {
         Navigator.of(context).popUntil((route) => route.isFirst);
-      }
-      
-      // Show success message
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🎉 Job completed! Customer received coins. Great work!'),
+            content: Text('🎉 Job completed! Great work!'),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 4),
+            duration: Duration(seconds: 3),
           ),
         );
       }
@@ -304,12 +300,11 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
       // Close loading
       if (mounted) Navigator.of(context).pop();
       
-      // Still show success to user (job completion is the main goal)
       if (mounted) {
         Navigator.of(context).popUntil((route) => route.isFirst);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🎉 Job completed! (Some updates pending)'),
+            content: Text('🎉 Job completed!'),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 3),
           ),
@@ -622,6 +617,7 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
                         MaterialPageRoute(
                           builder: (context) => CompleteJobPage(
                             booking: widget.bookingModel!,
+                            beforePhotos: _beforePhotos,
                           ),
                         ),
                       );
@@ -637,6 +633,7 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
                           MaterialPageRoute(
                             builder: (context) => CompleteJobPage(
                               booking: fetchedBooking,
+                              beforePhotos: _beforePhotos,
                             ),
                           ),
                         );

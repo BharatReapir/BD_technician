@@ -55,6 +55,11 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
     }
   }
 
+  String _maskPhoneNumber(String phone) {
+    if (phone.length < 4) return phone;
+    return 'XXXX-XX-${phone.substring(phone.length - 4)}';
+  }
+
   Future<void> _initializeConnectionChecks() async {
     _checkInternetConnection();
     
@@ -709,7 +714,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                   const SizedBox(height: 16),
                   _buildInfoRow('Name:', booking!.userName),
                   const SizedBox(height: 12),
-                  _buildInfoRow('Phone:', booking!.userPhone),
+                  _buildInfoRow('Phone:', _maskPhoneNumber(booking!.userPhone)),
                   const SizedBox(height: 12),
                   _buildInfoRow('Address:', booking!.address ?? 'Not provided'),
                   const SizedBox(height: 12),
@@ -723,7 +728,13 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                     width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: () {
-                        // TODO: Implement call functionality
+                        // TODO: Integrate Exotel/Twilio API here
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Connecting securely via Proxy...'),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
                       },
                       icon: const Icon(Icons.phone, color: Colors.white),
                       label: const Text(
@@ -1069,60 +1080,34 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
     }
 
     if (status == 'accepted') {
-      // Start Job + Complete Job buttons side by side
-      return Row(
-        children: [
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => JobInProgressPage(
-                      jobId: widget.bookingId,
-                      customerName: booking!.userName,
-                      service: booking!.service,
-                      timeSlot: booking!.scheduledTime,
-                    ),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 2,
+      // Only Start Job button — Complete comes after job is in progress
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => JobInProgressPage(
+                  jobId: widget.bookingId,
+                  customerName: booking!.userName,
+                  service: booking!.service,
+                  timeSlot: booking!.scheduledTime,
+                ),
               ),
-              child: const Text(
-                'Start Job',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
-              ),
-            ),
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            elevation: 2,
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CompleteJobPage(booking: booking!),
-                  ),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                elevation: 2,
-              ),
-              child: const Text(
-                'Complete Job',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
-              ),
-            ),
+          child: const Text(
+            'Start Job',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
           ),
-        ],
+        ),
       );
     }
 

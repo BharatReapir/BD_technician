@@ -95,7 +95,7 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Color(0xFF2563EB)),
+              leading: const Icon(Icons.camera_alt, color: Color(0xFF1E286D)),
               title: const Text('Take Photo'),
               onTap: () {
                 Navigator.pop(context);
@@ -103,7 +103,7 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Color(0xFF2563EB)),
+              leading: const Icon(Icons.photo_library, color: Color(0xFF1E286D)),
               title: const Text('Choose from Gallery'),
               onTap: () {
                 Navigator.pop(context);
@@ -295,9 +295,9 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4FF),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF2563EB),
+        backgroundColor: const Color(0xFF1E286D),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
@@ -319,7 +319,7 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
                 children: [
                   CircleAvatar(
                     radius: 28,
-                    backgroundColor: const Color(0xFF2563EB).withOpacity(0.12),
+                    backgroundColor: const Color(0xFF1E286D).withOpacity(0.12),
                     child: Text(
                       widget.booking.userName.isNotEmpty
                           ? widget.booking.userName[0].toUpperCase()
@@ -327,7 +327,7 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2563EB),
+                        color: Color(0xFF1E286D),
                       ),
                     ),
                   ),
@@ -465,10 +465,10 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
                             width: double.infinity,
                             height: 150,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF0F4FF),
+                              color: const Color(0xFFF5F6FA),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: const Color(0xFF2563EB).withOpacity(0.35),
+                                color: const Color(0xFF1E286D).withOpacity(0.35),
                                 style: BorderStyle.solid,
                               ),
                             ),
@@ -477,14 +477,14 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
                               children: [
                                 Icon(
                                   Icons.add_a_photo_outlined,
-                                  color: const Color(0xFF2563EB).withOpacity(0.6),
+                                  color: const Color(0xFF1E286D).withOpacity(0.6),
                                   size: 40,
                                 ),
                                 const SizedBox(height: 10),
                                 const Text(
                                   'Tap to upload after photo',
                                   style: TextStyle(
-                                    color: Color(0xFF2563EB),
+                                    color: Color(0xFF1E286D),
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -593,7 +593,7 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF2563EB),
+                          color: Color(0xFF1E286D),
                         ),
                       ),
                     ],
@@ -623,7 +623,7 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
                       Radio<String>(
                         value: 'Cash',
                         groupValue: _paymentMode,
-                        activeColor: const Color(0xFF2563EB),
+                        activeColor: const Color(0xFF1E286D),
                         onChanged: (v) => setState(() => _paymentMode = v!),
                       ),
                       const Text('Cash'),
@@ -631,7 +631,7 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
                       Radio<String>(
                         value: 'UPI',
                         groupValue: _paymentMode,
-                        activeColor: const Color(0xFF2563EB),
+                        activeColor: const Color(0xFF1E286D),
                         onChanged: (v) => setState(() => _paymentMode = v!),
                       ),
                       const Text('UPI'),
@@ -758,11 +758,11 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
                       ),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+                        side: const BorderSide(color: Color(0xFF1E286D), width: 1.5),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        foregroundColor: const Color(0xFF2563EB),
+                        foregroundColor: const Color(0xFF1E286D),
                       ),
                     ),
                   ),

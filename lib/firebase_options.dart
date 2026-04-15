@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDyYG4JXt2rYPpycGKso1-Ew0ST9HY6oaw',
-    appId: '1:402582001978:android:15d263e51ee79e5f221803',
+    appId: '1:402582001978:android:1a3f45be61269b2c221803', // Fixed Android App ID for technician app
     messagingSenderId: '402582001978',
     projectId: 'bharat-doorstep-native',
     databaseURL: 'https://bharat-doorstep-native-default-rtdb.asia-southeast1.firebasedatabase.app',

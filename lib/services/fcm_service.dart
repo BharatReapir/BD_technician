@@ -35,6 +35,11 @@ class FCMService {
         // Initialize local notifications
         await _initializeLocalNotifications();
         
+        // Ensure Android 13+ Notification Permissions are handled by FlutterLocalNotifications
+        await _localNotifications
+            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+            ?.requestNotificationsPermission();
+        
         // Setup message handlers
         _setupMessageHandlers();
         
@@ -84,7 +89,7 @@ class FCMService {
       'Booking Alerts',
       description: 'Notifications for new booking assignments',
       importance: Importance.high,
-      sound: RawResourceAndroidNotificationSound('notification'),
+      playSound: true,
     );
 
     await _localNotifications

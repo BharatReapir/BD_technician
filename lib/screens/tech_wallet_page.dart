@@ -2,8 +2,10 @@ import '../constants/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:provider/provider.dart';
 import '../services/wallet_service.dart';
 import '../services/tech_payment_service.dart';
+import '../providers/auth_provider.dart';
 import '../models/wallet_transaction_model.dart';
 import '../models/billing_model.dart';
 import 'package:intl/intl.dart';
@@ -22,6 +24,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
   final TextEditingController _amountController = TextEditingController();
   late Razorpay _razorpay;
   bool _isLoading = false;
+  late Stream<double> _balanceStream;
 
   // ⚠️ REPLACE WITH YOUR ACTUAL RAZORPAY KEY
   static const String RAZORPAY_KEY = 'rzp_test_S4yQ9pfJFZGHEV';
@@ -33,8 +36,11 @@ class _TechWalletPageState extends State<TechWalletPage> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
-    
-    // Debug: Print technician ID
+
+    // Refresh every 5 seconds — avoids rebuilding stream on every frame
+    _balanceStream = Stream.periodic(const Duration(seconds: 5))
+        .asyncMap((_) => _walletService.getWalletBalance(widget.technicianId));
+
     debugPrint('🔍 Technician ID: ${widget.technicianId}');
   }
 
@@ -45,15 +51,15 @@ class _TechWalletPageState extends State<TechWalletPage> {
     super.dispose();
   }
 
+  // ─── Payment Handlers ───────────────────────────────────────────────────────
+
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
     debugPrint('✅ Payment Success');
     debugPrint('Order ID: ${response.orderId}');
     debugPrint('Payment ID: ${response.paymentId}');
     debugPrint('Signature: ${response.signature}');
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       await TechPaymentService.verifyWalletPayment(
@@ -63,28 +69,23 @@ class _TechWalletPageState extends State<TechWalletPage> {
         technicianId: widget.technicianId,
       );
 
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('✅ Wallet recharged successfully!'),
-            backgroundColor: AppColors.primary,
+            backgroundColor: Color(0xFF1E286D),
           ),
         );
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-
+      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ Verification failed: $e'),
-            backgroundColor: AppColors.primary,
+            backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
         );
@@ -93,19 +94,14 @@ class _TechWalletPageState extends State<TechWalletPage> {
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
-    debugPrint('❌ Payment Failed');
-    debugPrint('Code: ${response.code}');
-    debugPrint('Message: ${response.message}');
-
-    setState(() {
-      _isLoading = false;
-    });
+    debugPrint('❌ Payment Failed: ${response.code} - ${response.message}');
+    setState(() => _isLoading = false);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Payment Failed: ${response.message}'),
-          backgroundColor: AppColors.primary,
+          backgroundColor: Colors.red,
           duration: const Duration(seconds: 5),
         ),
       );
@@ -121,19 +117,17 @@ class _TechWalletPageState extends State<TechWalletPage> {
     }
   }
 
-  Future<void> _initiatePayment() async {
+  // ─── Payment Flow ────────────────────────────────────────────────────────────
+
+  Future<void> _initiatePayment(StateSetter? setDialogState) async {
     final amountText = _amountController.text.trim();
-    
-    debugPrint('🔍 Initiating payment...');
-    debugPrint('Amount text: "$amountText"');
-    
+
     if (amountText.isEmpty) {
       _showError('Please enter an amount');
       return;
     }
 
-    double? amount = double.tryParse(amountText);
-    
+    final double? amount = double.tryParse(amountText);
     if (amount == null) {
       _showError('Invalid amount entered');
       return;
@@ -144,49 +138,42 @@ class _TechWalletPageState extends State<TechWalletPage> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
+    if (setDialogState != null) {
+        setDialogState(() => _isLoading = true);
+    }
 
     try {
-      debugPrint('📤 Creating order for ₹$amount');
-      debugPrint('📤 Technician ID: ${widget.technicianId}');
-      
-      // Calculate GST-compliant wallet recharge
       final rechargeCalculation = PricingCalculator.calculateWalletRecharge(amount);
       final totalAmount = rechargeCalculation['totalAmount']!;
       final gstAmount = rechargeCalculation['gstAmount']!;
-      
-      debugPrint('💰 Recharge Amount: ₹$amount');
-      debugPrint('💰 GST Amount: ₹$gstAmount');
-      debugPrint('💰 Total Amount: ₹$totalAmount');
-      
-      // Create order on backend
+
+      debugPrint('💰 Amount: ₹$amount | GST: ₹$gstAmount | Total: ₹$totalAmount');
+
       final orderData = await TechPaymentService.createWalletRechargeOrder(
         technicianId: widget.technicianId,
-        amount: totalAmount, // Send total amount including GST
+        amount: totalAmount,
       );
 
-      debugPrint('📥 Order data received: $orderData');
+      debugPrint('📥 Order data: $orderData');
 
-      // Check if orderId exists
       if (!orderData.containsKey('orderId') || orderData['orderId'] == null) {
         throw Exception('Order ID not received from server');
       }
 
-      var options = {
+      final tech = context.read<AuthProvider>().technician;
+
+      final options = {
         'key': RAZORPAY_KEY,
-        'amount': (totalAmount * 100).toInt(), // Amount in paise (including GST)
+        'amount': (totalAmount * 100).toInt(),
         'order_id': orderData['orderId'],
         'name': 'Wallet Recharge',
-        'description': 'Recharge your technician wallet (₹$amount + GST ₹${gstAmount.toStringAsFixed(2)})',
+        'description': 'Recharge ₹$amount + GST ₹${gstAmount.toStringAsFixed(2)}',
         'prefill': {
-          'contact': '',
-          'email': '',
+          'contact': tech?.mobile ?? '',
+          'email': tech?.email ?? '',
         },
-        'theme': {
-          'color': '#EB4D4B',
-        },
+        'theme': {'color': '#1E286D'},
         'notes': {
           'recharge_amount': amount.toString(),
           'gst_amount': gstAmount.toString(),
@@ -194,24 +181,22 @@ class _TechWalletPageState extends State<TechWalletPage> {
         },
       };
 
-      if (mounted) {
-        Navigator.pop(context); // Close dialog first
+      if (mounted && setDialogState != null) {
+        Navigator.pop(context); // close dialog
       }
 
-      debugPrint('🚀 Opening Razorpay with options: $options');
       _razorpay.open(options);
       _amountController.clear();
-
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
+      if (setDialogState != null) {
+          setDialogState(() => _isLoading = false);
+      }
     } catch (e) {
       debugPrint('❌ Error in _initiatePayment: $e');
-      
-      setState(() {
-        _isLoading = false;
-      });
-
+      setState(() => _isLoading = false);
+      if (setDialogState != null) {
+          setDialogState(() => _isLoading = false);
+      }
       _showError('Failed to create order: $e');
     }
   }
@@ -221,140 +206,151 @@ class _TechWalletPageState extends State<TechWalletPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: AppColors.primary,
+          backgroundColor: const Color(0xFF1E286D),
           duration: const Duration(seconds: 5),
         ),
       );
     }
   }
 
+  // ─── Recharge Dialog ─────────────────────────────────────────────────────────
+
   void _showRechargeDialog() {
-    _amountController.clear(); // Clear before showing
-    
+    _amountController.clear();
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Recharge Wallet'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: InputDecoration(
-                labelText: 'Recharge Amount',
-                prefixText: '₹',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                hintText: 'Enter amount',
-                helperText: 'GST @18% will be added',
-              ),
-              onChanged: (value) {
-                setState(() {}); // Trigger rebuild to update GST calculation
-              },
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final text = _amountController.text;
+          final parsedAmount = double.tryParse(text);
+          final hasValidAmount = text.isNotEmpty && parsedAmount != null;
+
+          return AlertDialog(
+            title: const Text(
+              'Recharge Wallet',
+              style: TextStyle(color: Color(0xFF1E286D), fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 16),
-            
-            // GST Breakdown Display
-            if (_amountController.text.isNotEmpty && double.tryParse(_amountController.text) != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.bgLight,
-                  borderRadius: BorderRadius.circular(8),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _amountController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'Recharge Amount',
+                    prefixText: '₹',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    hintText: 'Enter amount',
+                    helperText: 'GST @18% will be added',
+                  ),
+                  onChanged: (_) => setDialogState(() {}),
                 ),
-                child: Column(
+                const SizedBox(height: 16),
+
+                // GST Breakdown
+                if (hasValidAmount)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgLight,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      children: [
+                        _breakdownRow('Amount:', '₹$text'),
+                        const SizedBox(height: 4),
+                        _breakdownRow(
+                          'GST (18%):',
+                          '₹${(parsedAmount! * 0.18).toStringAsFixed(2)}',
+                        ),
+                        const Divider(height: 16),
+                        _breakdownRow(
+                          'Total Payable:',
+                          '₹${(parsedAmount * 1.18).toStringAsFixed(2)}',
+                          bold: true,
+                          valueColor: const Color(0xFFFF6D00),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Recharge Amount:'),
-                        Text('₹${_amountController.text}'),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('GST @18%:'),
-                        Text('₹${(double.parse(_amountController.text) * 0.18).toStringAsFixed(2)}'),
-                      ],
-                    ),
-                    const Divider(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Total Payable:', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text('₹${(double.parse(_amountController.text) * 1.18).toStringAsFixed(2)}', 
-                             style: const TextStyle(fontWeight: FontWeight.bold)),
-                      ],
-                    ),
+                    _quickBtn(500, setDialogState),
+                    _quickBtn(1000, setDialogState),
+                    _quickBtn(2000, setDialogState),
                   ],
                 ),
-              ),
-            
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildQuickAmountButton(500),
-                _buildQuickAmountButton(1000),
-                _buildQuickAmountButton(2000),
+                const SizedBox(height: 8),
+                Text(
+                  'Min: ₹100 • GST @18%',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Minimum: ₹100 • GST @18% applicable',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
               ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              _amountController.clear();
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: _isLoading ? null : _initiatePayment,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Pay Now'),
-          ),
-        ],
+              ElevatedButton(
+                onPressed: _isLoading ? null : () => _initiatePayment(setDialogState),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFF6D00),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Pay Now', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildQuickAmountButton(int amount) {
+  Widget _breakdownRow(String label, String value,
+      {bool bold = false, Color? valueColor}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(fontWeight: bold ? FontWeight.bold : FontWeight.normal)),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
+            color: valueColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _quickBtn(int amount, StateSetter setDialogState) {
     return OutlinedButton(
-      onPressed: () {
+      onPressed: () => setDialogState(() {
         _amountController.text = amount.toString();
-      },
+      }),
       style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        side: const BorderSide(color: Color(0xFF1E286D)),
+        foregroundColor: const Color(0xFF1E286D),
       ),
       child: Text('₹$amount'),
     );
   }
+
+  // ─── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -365,19 +361,18 @@ class _TechWalletPageState extends State<TechWalletPage> {
           children: [
             // Header
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(8, 12, 20, 12),
               color: Colors.white,
               child: Row(
                 children: [
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back, color: Colors.black87),
+                    icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF1E286D), size: 20),
                   ),
-                  const SizedBox(width: 8),
                   const Text(
                     'My Wallet',
                     style: TextStyle(
-                      color: Colors.black87,
+                      color: Color(0xFF1E286D),
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                     ),
@@ -385,29 +380,28 @@ class _TechWalletPageState extends State<TechWalletPage> {
                 ],
               ),
             ),
-            
-            // Wallet Balance Card
+
+            // Balance Card
             StreamBuilder<double>(
-              stream: Stream.periodic(const Duration(seconds: 1)).asyncMap(
-                  (_) => _walletService.getWalletBalance(widget.technicianId)),
+              stream: _balanceStream,
               builder: (context, snapshot) {
-                double balance = snapshot.data ?? 0.0;
-                double minReserve = 1000.0;
-                double withdrawable = (balance - minReserve).clamp(0, double.infinity);
+                final balance = snapshot.data ?? 0.0;
+                const minReserve = 1000.0;
+                final withdrawable = (balance - minReserve).clamp(0.0, double.infinity);
 
                 return Container(
                   margin: const EdgeInsets.symmetric(horizontal: 20),
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF2563EB), Color(0xFF1E40AF)],
+                      colors: [Color(0xFF1E286D), Color(0xFF2D3B8D)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF2563EB).withOpacity(0.3),
+                        color: const Color(0xFF1E286D).withOpacity(0.3),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -418,10 +412,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
                     children: [
                       const Text(
                         'Total Wallet Balance',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white70,
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.white70),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -436,89 +427,19 @@ class _TechWalletPageState extends State<TechWalletPage> {
                       Row(
                         children: [
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Minimum Reserve',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Text(
-                                      '₹${minReserve.toStringAsFixed(0)}',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red.withOpacity(0.3),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Text(
-                                        'Locked',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                            child: _balanceInfoColumn(
+                              label: 'Minimum Reserve',
+                              value: '₹${minReserve.toStringAsFixed(0)}',
+                              badge: 'Locked',
+                              badgeColor: const Color(0xFFFF6D00).withOpacity(0.35),
                             ),
                           ),
                           Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Withdrawable',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    Text(
-                                      '₹${withdrawable.toStringAsFixed(0)}',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.withOpacity(0.3),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Text(
-                                        'Available',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
+                            child: _balanceInfoColumn(
+                              label: 'Withdrawable',
+                              value: '₹${withdrawable.toStringAsFixed(0)}',
+                              badge: 'Available',
+                              badgeColor: Colors.green.withOpacity(0.35),
                             ),
                           ),
                         ],
@@ -528,9 +449,9 @@ class _TechWalletPageState extends State<TechWalletPage> {
                 );
               },
             ),
-            
+
             const SizedBox(height: 20),
-            
+
             // Action Buttons
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -544,12 +465,10 @@ class _TechWalletPageState extends State<TechWalletPage> {
                       icon: const Icon(Icons.arrow_upward, size: 20),
                       label: const Text('Withdraw'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
+                        backgroundColor: const Color(0xFF1E286D),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         elevation: 0,
                       ),
                     ),
@@ -561,21 +480,19 @@ class _TechWalletPageState extends State<TechWalletPage> {
                       icon: const Icon(Icons.trending_up, size: 20),
                       label: const Text('Recharge'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF2563EB),
+                        foregroundColor: const Color(0xFFFF6D00),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        side: const BorderSide(color: Color(0xFFFF6D00), width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Transaction History
             Expanded(
               child: Container(
@@ -590,7 +507,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Padding(
-                      padding: EdgeInsets.all(20.0),
+                      padding: EdgeInsets.all(20),
                       child: Text(
                         'Transaction History',
                         style: TextStyle(
@@ -602,32 +519,24 @@ class _TechWalletPageState extends State<TechWalletPage> {
                     ),
                     Expanded(
                       child: StreamBuilder<List<WalletTransaction>>(
-                        stream: _walletService
-                            .getTransactionHistory(widget.technicianId),
+                        stream: _walletService.getTransactionHistory(widget.technicianId),
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                                child: CircularProgressIndicator());
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
                           }
 
                           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                            return const Center(
-                              child: Text('No transactions yet'),
-                            );
+                            return const Center(child: Text('No transactions yet'));
                           }
 
-                          List<WalletTransaction> transactions =
-                              snapshot.data!;
+                          final transactions = snapshot.data!;
 
                           return ListView.builder(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 20),
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
                             itemCount: transactions.length,
                             itemBuilder: (context, index) {
-                              WalletTransaction transaction =
-                                  transactions[index];
-                              bool isCredit = transaction.type == 'credit';
+                              final tx = transactions[index];
+                              final isCredit = tx.type == 'credit';
 
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 12),
@@ -647,23 +556,18 @@ class _TechWalletPageState extends State<TechWalletPage> {
                                         shape: BoxShape.circle,
                                       ),
                                       child: Icon(
-                                        isCredit
-                                            ? Icons.arrow_downward
-                                            : Icons.arrow_upward,
-                                        color: isCredit
-                                            ? Colors.green
-                                            : Colors.red,
+                                        isCredit ? Icons.arrow_downward : Icons.arrow_upward,
+                                        color: isCredit ? Colors.green : Colors.red,
                                         size: 20,
                                       ),
                                     ),
                                     const SizedBox(width: 16),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            transaction.description,
+                                            tx.description,
                                             style: const TextStyle(
                                               fontWeight: FontWeight.w600,
                                               fontSize: 14,
@@ -672,12 +576,8 @@ class _TechWalletPageState extends State<TechWalletPage> {
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            DateFormat('dd MMM yyyy, hh:mm a')
-                                                .format(transaction.timestamp),
-                                            style: TextStyle(
-                                              color: Colors.grey[600],
-                                              fontSize: 12,
-                                            ),
+                                            DateFormat('dd MMM yyyy, hh:mm a').format(tx.timestamp),
+                                            style: TextStyle(color: Colors.grey[600], fontSize: 12),
                                           ),
                                         ],
                                       ),
@@ -686,22 +586,17 @@ class _TechWalletPageState extends State<TechWalletPage> {
                                       crossAxisAlignment: CrossAxisAlignment.end,
                                       children: [
                                         Text(
-                                          '${isCredit ? '+' : '-'}₹${transaction.amount.toStringAsFixed(0)}',
+                                          '${isCredit ? '+' : '-'}₹${tx.amount.toStringAsFixed(0)}',
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 16,
-                                            color: isCredit
-                                                ? Colors.green
-                                                : Colors.red,
+                                            color: isCredit ? Colors.green : Colors.red,
                                           ),
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          'Bal: ₹${transaction.balanceAfter.toStringAsFixed(0)}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey[600],
-                                          ),
+                                          'Bal: ₹${tx.balanceAfter.toStringAsFixed(0)}',
+                                          style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                                         ),
                                       ],
                                     ),
@@ -720,6 +615,41 @@ class _TechWalletPageState extends State<TechWalletPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _balanceInfoColumn({
+    required String label,
+    required String value,
+    required String badge,
+    required Color badgeColor,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Text(
+              value,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: badgeColor,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                badge,
+                style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

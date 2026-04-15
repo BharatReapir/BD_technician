@@ -318,9 +318,9 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0047AB),
+        backgroundColor: const Color(0xFF1E286D),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
@@ -339,8 +339,8 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFF0047AB),
-                    Colors.teal.shade400,
+                    const Color(0xFF1E286D),
+                    const Color(0xFF2D3B8D),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -427,7 +427,7 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
                                     child: Container(
                                       padding: const EdgeInsets.all(4),
                                       decoration: BoxDecoration(
-                                        color: AppColors.primary,
+                                        color: const Color(0xFFFF6D00),
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(
@@ -493,7 +493,7 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
                 onPressed: _pickImage,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: BorderSide(color: Colors.blue[700]!, width: 2),
+                  side: BorderSide(color: const Color(0xFF1E286D), width: 2),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -501,14 +501,14 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.camera_alt, color: Colors.blue[700]),
+                    Icon(Icons.camera_alt, color: const Color(0xFF1E286D)),
                     const SizedBox(width: 8),
                     Text(
                       'Upload Photos',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.blue[700],
+                        color: const Color(0xFF1E286D),
                       ),
                     ),
                   ],
@@ -578,7 +578,7 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
                 onPressed: _showAddChargesDialog,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  side: BorderSide(color: Colors.blue[700]!, width: 2),
+                  side: BorderSide(color: const Color(0xFF1E286D), width: 2),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -586,14 +586,14 @@ class _JobInProgressPageState extends State<JobInProgressPage> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.add_circle_outline, color: Colors.blue[700]),
+                    Icon(Icons.add_circle_outline, color: const Color(0xFF1E286D)),
                     const SizedBox(width: 8),
                     Text(
                       'Add Extra Charges',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: Colors.blue[700],
+                        color: const Color(0xFF1E286D),
                       ),
                     ),
                   ],

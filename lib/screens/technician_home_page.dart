@@ -87,13 +87,13 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
 
   Widget _buildJobsPage(TechnicianModel technician) {
     return Container(
-      color: const Color(0xFFF5F5F5),
+      color: const Color(0xFFF5F6FA),
       child: SafeArea(
         child: Column(
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              color: const Color(0xFF2563EB),
+              color: const Color(0xFF1E286D),
               child: Row(
                 children: [
                   const Text(
@@ -269,7 +269,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
         });
       },
       type: BottomNavigationBarType.fixed,
-      selectedItemColor: const Color(0xFF2563EB),
+      selectedItemColor: const Color(0xFF1E286D),
       unselectedItemColor: Colors.grey,
       backgroundColor: Colors.white,
       elevation: 8,
@@ -303,7 +303,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     AuthProvider authProvider,
   ) {
     return Container(
-      color: const Color(0xFF2563EB), // Blue background
+      color: const Color(0xFF1E286D), // Navy background
       child: SafeArea(
         child: Column(
           children: [
@@ -322,7 +322,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2563EB),
+                        color: Color(0xFF1E286D),
                       ),
                     ),
                   ),
@@ -438,7 +438,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            '?${currentTechnician.walletBalance.toStringAsFixed(0)}',
+                            '₹${currentTechnician.walletBalance.toStringAsFixed(0)}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -532,7 +532,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                           label: "Today's Jobs",
                           value: '$todayJobs',
                           icon: Icons.today_rounded,
-                          color: const Color(0xFF2563EB),
+                          color: const Color(0xFF1E286D),
                         ),
                       ),
                       const SizedBox(width: 12),

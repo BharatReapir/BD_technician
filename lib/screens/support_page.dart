@@ -27,7 +27,7 @@ class SupportPage extends StatelessWidget {
               margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   colors: [AppColors.primary, AppColors.tertiary],
                 ),
                 borderRadius: BorderRadius.circular(16),

@@ -468,9 +468,9 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
       return Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0047AB),
+          backgroundColor: const Color(0xFF1E286D),
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
             onPressed: () => Navigator.pop(context),
           ),
           title: Row(
@@ -529,9 +529,9 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
       return Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0047AB),
+          backgroundColor: const Color(0xFF1E286D),
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
             onPressed: () => Navigator.pop(context),
           ),
           title: Row(
@@ -661,9 +661,9 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0047AB),
+        backgroundColor: const Color(0xFF1E286D),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(

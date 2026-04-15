@@ -2,18 +2,16 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("com.google.gms.google-services")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
-    namespace = "com.example.bharatapp"
+    namespace = "com.example.bharatapp.technician"
     compileSdk = flutter.compileSdkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
-        // 🔔 Enable core library desugaring for flutter_local_notifications
         isCoreLibraryDesugaringEnabled = true
     }
 
@@ -23,7 +21,7 @@ android {
 
     defaultConfig {
         // BDR Technician App - Partner/Employee Application
-        applicationId = "com.example.bharatapp"
+        applicationId = "com.example.bharatapp.technician"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

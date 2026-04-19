@@ -6,7 +6,7 @@ import '../constants/colors.dart';
 import '../models/booking_model.dart';
 import '../models/billing_model.dart';
 import '../services/firebase_service.dart';
-import '../services/pdf_service.dart'; // 📄 NEW: PDF service
+import '../services/pdf_service.dart';
 import '../providers/auth_provider.dart' as auth_provider;
 import '../providers/coin_provider.dart';
 
@@ -719,46 +719,29 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
             ),
           ],
           
-          // 📄 NEW: PDF download button for completed bookings
+          // 📄 Restore: PDF option for completed bookings
           if (booking.status == 'completed') ...[
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _downloadInvoicePDF(booking),
-                    icon: const Icon(Icons.download, size: 18),
-                    label: const Text('Download Invoice'),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.green),
-                      foregroundColor: Colors.green,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _viewCertificatePDF(booking),
+                icon: const Icon(Icons.verified_outlined, size: 18),
+                label: const Text('Certificate'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade600,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _shareInvoicePDF(booking),
-                    icon: const Icon(Icons.share, size: 18),
-                    label: const Text('Share Invoice'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ],
-        ],
-      ),
-    );
+          ],
+        ),
+      );
   }
 
   void _showCancelDialog(BookingModel booking) {
@@ -980,124 +963,36 @@ class _BookingsPageState extends State<BookingsPage> with SingleTickerProviderSt
     }
   }
 
-  /// 📄 Download invoice PDF
-  Future<void> _downloadInvoicePDF(BookingModel booking) async {
+
+  /// 📄 View job certificate
+  Future<void> _viewCertificatePDF(BookingModel booking) async {
     try {
-      debugPrint('📄 Downloading invoice PDF for booking: ${booking.id}');
-      
-      // Show loading
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Row(
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Text('Generating invoice...'),
+              const CircularProgressIndicator(color: AppColors.primary),
+              const SizedBox(height: 20),
+              const Text('Generating Certificate...', style: TextStyle(fontWeight: FontWeight.w600)),
             ],
           ),
         ),
       );
       
-      // Generate GST-compliant invoice
-      final billing = PricingCalculator.calculateBilling(
-        customerName: booking.userName,
-        serviceAddress: booking.address ?? 'N/A',
-        serviceName: booking.service,
-        servicePrice: booking.serviceCharge,
-        pincode: booking.pincode ?? '000000',
-        coinDiscount: booking.coinDiscount ?? 0.0,
-        technicianName: booking.technicianName ?? 'TBD',
-        bookingId: booking.id,
+      await PDFService.printJobCompletionCertificate(
+        booking: booking,
+        technicianName: booking.technicianName ?? 'Partner',
+        completedJobsCount: 0, // Fallback
       );
-      
-      await PDFService.generateGSTInvoice(
-        billing: billing,
-        downloadToDevice: false, // Share instead of download
-      );
-      
-      // Close loading
       if (mounted) Navigator.of(context).pop();
-      
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('📄 Invoice downloaded successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
     } catch (e) {
-      // Close loading
       if (mounted) Navigator.of(context).pop();
-      
-      debugPrint('❌ Error downloading PDF: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error downloading invoice: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint('❌ Error viewing certificate: $e');
     }
   }
 
-  /// 📄 Share invoice PDF
-  Future<void> _shareInvoicePDF(BookingModel booking) async {
-    try {
-      debugPrint('📄 Sharing invoice PDF for booking: ${booking.id}');
-      
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Row(
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(width: 16),
-              Text('Preparing invoice...'),
-            ],
-          ),
-        ),
-      );
-      
-      // Generate GST-compliant invoice
-      final billing = PricingCalculator.calculateBilling(
-        customerName: booking.userName,
-        serviceAddress: booking.address ?? 'N/A',
-        serviceName: booking.service,
-        servicePrice: booking.serviceCharge,
-        pincode: booking.pincode ?? '000000',
-        coinDiscount: booking.coinDiscount ?? 0.0,
-        technicianName: booking.technicianName ?? 'TBD',
-        bookingId: booking.id,
-      );
-      
-      await PDFService.generateGSTInvoice(
-        billing: billing,
-        downloadToDevice: false, // Share instead of download
-      );
-      
-      // Close loading
-      if (mounted) Navigator.of(context).pop();
-      
-    } catch (e) {
-      // Close loading
-      if (mounted) Navigator.of(context).pop();
-      
-      debugPrint('❌ Error sharing PDF: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Error sharing invoice: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
 }

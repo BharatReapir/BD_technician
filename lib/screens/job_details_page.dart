@@ -655,8 +655,8 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
       );
     }
 
-    final earnings = CommissionCalculator.getTechnicianEarnings(booking!.totalAmount);
-    final commission = CommissionCalculator.getCommission(booking!.totalAmount);
+    final earnings = CommissionCalculator.getTechnicianEarnings(booking!.serviceCharge);
+    final commission = CommissionCalculator.getCommission(booking!.serviceCharge);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -821,6 +821,63 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                     ],
                   ),
                   const SizedBox(height: 16),
+
+                  // Payment Status Badge
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: (booking!.paymentStatus == 'paid' || booking!.paymentStatus == 'completed')
+                          ? Colors.green.withOpacity(0.1)
+                          : Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: (booking!.paymentStatus == 'paid' || booking!.paymentStatus == 'completed')
+                            ? Colors.green.withOpacity(0.3)
+                            : Colors.orange.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          (booking!.paymentStatus == 'paid' || booking!.paymentStatus == 'completed')
+                              ? Icons.check_circle
+                              : Icons.pending,
+                          color: (booking!.paymentStatus == 'paid' || booking!.paymentStatus == 'completed')
+                              ? Colors.green
+                              : Colors.orange,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (booking!.paymentStatus == 'paid' || booking!.paymentStatus == 'completed')
+                                    ? '✅ Paid'
+                                    : '❌ Pending Payment',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: (booking!.paymentStatus == 'paid' || booking!.paymentStatus == 'completed')
+                                      ? Colors.green
+                                      : Colors.orange,
+                                ),
+                              ),
+                              if (booking!.paymentMethod != null)
+                                Text(
+                                  'Method: ${booking!.paymentMethod}',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   _buildInvoiceRow(
                     'Service Charge',
                     '₹${booking!.serviceCharge.toStringAsFixed(0)}',
@@ -872,8 +929,8 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  // Technician Earnings summary
+                  const SizedBox(height: 16),
+                  // 💰 Technician Earnings with GST correction
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -882,49 +939,59 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
                       border: Border.all(
                           color: Colors.green.withOpacity(0.25)),
                     ),
-                    child: Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.account_balance_wallet,
-                            color: Colors.green, size: 20),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Your Earnings (after 20% commission)',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.black54,
-                                ),
+                        const Row(
+                          children: [
+                            Icon(Icons.account_balance_wallet,
+                                color: Colors.green, size: 20),
+                            SizedBox(width: 10),
+                            Text(
+                              'Your Earnings Breakdown',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
                               ),
-                              Text(
-                                '₹${earnings.toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                        const SizedBox(height: 12),
+                        _buildInvoiceRow(
+                          'Total Amount',
+                          '₹${booking!.totalAmount.toStringAsFixed(0)}',
+                        ),
+                        const SizedBox(height: 4),
+                        _buildInvoiceRow(
+                          'GST (→ Company)',
+                          '-₹${CommissionCalculator.getGSTAmount(booking!.serviceCharge).toStringAsFixed(0)}',
+                          valueColor: Colors.red,
+                        ),
+                        const SizedBox(height: 4),
+                        _buildInvoiceRow(
+                          'Commission (→ Company)',
+                          '-₹${commission.toStringAsFixed(0)}',
+                          valueColor: Colors.red,
+                        ),
+                        const Divider(height: 16, color: Colors.green),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              'Platform fee',
+                              '✅ Your Earnings',
                               style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.black38,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
                               ),
                             ),
                             Text(
-                              '-₹${commission.toStringAsFixed(0)}',
+                              '₹${earnings.toStringAsFixed(0)}',
                               style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.red,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green,
                               ),
                             ),
                           ],

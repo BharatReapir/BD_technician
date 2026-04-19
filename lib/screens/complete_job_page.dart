@@ -6,9 +6,12 @@ import 'package:signature/signature.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../models/booking_model.dart';
+import '../models/billing_model.dart';
 import '../services/firebase_service.dart';
 import '../services/pdf_service.dart';
 import '../providers/auth_provider.dart';
+import '../utils/commission_calculator.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 class CompleteJobPage extends StatefulWidget {
   final BookingModel booking;
@@ -33,13 +36,55 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
   );
   final ImagePicker _picker = ImagePicker();
 
+  late Razorpay _razorpay;
+
   File? _afterPhoto;
   String _paymentMode = 'Cash';
   bool _paymentReceived = false;
   bool _isLoading = false;
+  bool _showQRCode = false;
+
+  // Check if customer already paid online
+  bool get _isAlreadyPaid => 
+      widget.booking.paymentStatus == 'paid' || 
+      widget.booking.paymentStatus == 'completed';
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    // Auto-set payment received if already paid online
+    if (_isAlreadyPaid) {
+      _paymentReceived = true;
+      _paymentMode = widget.booking.paymentMethod ?? 'UPI';
+    }
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    if (mounted) {
+      setState(() {
+        _paymentReceived = true;
+        _paymentMode = 'UPI (Razorpay)';
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment Successful!'), backgroundColor: Colors.green),
+      );
+    }
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Payment Failed: ${response.message}'), backgroundColor: Colors.red),
+      );
+    }
+  }
 
   @override
   void dispose() {
+    _razorpay.clear();
     _materialCostController.dispose();
     _extraChargesController.dispose();
     _signatureController.dispose();
@@ -48,9 +93,28 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
 
   double get _materialCost => double.tryParse(_materialCostController.text) ?? 0.0;
   double get _extraCharges => double.tryParse(_extraChargesController.text) ?? 0.0;
-  double get _serviceCharge => widget.booking.serviceCharge;
-  double get _gst => (_serviceCharge + _materialCost + _extraCharges) * 0.18;
-  double get _totalAmount => _serviceCharge + _materialCost + _extraCharges + _gst;
+
+  /// Service Amount = base service charge + material + extra charges
+  /// This is the "kaam ka charge" - the actual work amount
+  double get _serviceAmount => widget.booking.serviceCharge + _materialCost + _extraCharges;
+
+  /// Visiting charge from the booking (if applicable)
+  double get _visitingCharge => widget.booking.visitingCharge;
+
+  /// GST is calculated on Service Amount only (Rule #3)
+  double get _gst => CommissionCalculator.getGSTAmount(_serviceAmount);
+
+  /// Final Bill = Service Amount + GST (Rule #3)
+  double get _finalBill => _serviceAmount + _gst;
+
+  /// Commission is based on Service Amount only, NOT Final Bill (Rule #4, #11)
+  double get _commissionToCompany => CommissionCalculator.getCommission(_serviceAmount);
+
+  /// GST goes to company
+  double get _gstToCompany => _gst;
+
+  /// Technician Net Earning = Final Bill - GST - Commission = Service Amount - Commission (Rule #9)
+  double get _technicianEarnings => CommissionCalculator.getTechnicianEarnings(_serviceAmount);
 
   Future<void> _pickAfterPhoto(ImageSource source) async {
     try {
@@ -118,38 +182,6 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
   }
 
 
-  Future<void> _generateInvoice() async {
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final technician = authProvider.technician;
-      if (technician == null) throw Exception('Technician not found');
-
-      // Use Job Completion Certificate (not GST invoice — that's for the customer)
-      await PDFService.printJobCompletionCertificate(
-        booking: widget.booking,
-        technicianName: technician.name,
-        completedJobsCount: technician.completedJobs ?? 0,
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('✅ Certificate generated successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error generating certificate: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
 
   Future<void> _completeJob() async {
     if (_signatureController.isEmpty) {
@@ -224,11 +256,39 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
         // We still continue to complete the job even if photo upload fails
       }
 
+      // Update payment status in Firebase
+      if (!_isAlreadyPaid) {
+        await FirebaseService.updatePaymentStatus(
+          bookingId: widget.booking.id,
+          paymentStatus: 'paid',
+          paymentMethod: _paymentMode,
+        );
+      }
+
       // Complete the job
       await FirebaseService.completeJobAndClearTechnician(
         widget.booking.id,
         technician.uid,
       );
+
+      // Credit technician earnings (GST & commission go to company)
+      // Rule: Commission is based on Service Amount only, NOT Final Bill
+      try {
+        final earningsData = CommissionCalculator.calculateEarnings(_serviceAmount);
+        await FirebaseService.creditTechnicianEarnings(
+          technicianId: technician.uid,
+          bookingId: widget.booking.id,
+          serviceAmount: _serviceAmount,
+          earnings: earningsData['technicianEarnings'],
+          gstAmount: earningsData['gstAmount'],
+          commission: earningsData['commission'],
+          finalBill: _finalBill,
+          visitingCharge: _visitingCharge,
+          paymentMethod: _paymentMode,
+        );
+      } catch (e) {
+        debugPrint('⚠️ Error crediting earnings: $e');
+      }
 
       await authProvider.refreshTechnicianData();
 
@@ -258,24 +318,13 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
         debugPrint('❌ Error crediting coins: $e');
       }
 
-      // Generate invoice automatically
-      try {
-        await _generateInvoice();
-      } catch (e) {
-        debugPrint('⚠️ Auto invoice generation failed: $e');
-      }
+      // Credit logic moved above and auto-invoice removed
 
       setState(() => _isLoading = false);
 
+      // Show success sheet instead of immediate pop
       if (mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 Job completed successfully! Customer received coins.'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 4),
-          ),
-        );
+        _showJobSuccessSheet();
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -556,32 +605,38 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
 
             const SizedBox(height: 12),
 
-            // ── Bill Summary ──────────────────────────────────────────
+            // ── Invoice Breakdown (Customer Bill) ──────────────────────
             _buildCard(
               backgroundColor: const Color(0xFFEFF6FF),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildSectionTitle(
-                    icon: Icons.summarize_outlined,
-                    title: 'Bill Summary',
+                    icon: Icons.receipt_outlined,
+                    title: 'Invoice Breakdown',
                   ),
                   const SizedBox(height: 14),
-                  _buildBillRow('Service Charge',
-                      '₹${_serviceCharge.toStringAsFixed(0)}'),
+                  _buildBillRow('Service Amount',
+                      '₹${widget.booking.serviceCharge.toStringAsFixed(0)}'),
                   if (_materialCost > 0)
                     _buildBillRow(
                         'Material Cost', '₹${_materialCost.toStringAsFixed(0)}'),
                   if (_extraCharges > 0)
                     _buildBillRow(
                         'Extra Charges', '₹${_extraCharges.toStringAsFixed(0)}'),
-                  _buildBillRow('GST (18%)', '₹${_gst.toStringAsFixed(2)}'),
+                  if (_visitingCharge > 0) ...[
+                    _buildBillRow(
+                        'Visiting Charge', '₹${_visitingCharge.toStringAsFixed(0)}'),
+                    _buildBillRow(
+                        'Visiting Charge (Adjusted)', '-₹${_visitingCharge.toStringAsFixed(0)}'),
+                  ],
+                  _buildBillRow('GST (18%)', '₹${_gst.toStringAsFixed(0)}'),
                   const Divider(height: 24, color: Color(0xFFBDD7FF)),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Total Amount',
+                        'Total Bill',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -589,11 +644,71 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
                         ),
                       ),
                       Text(
-                        '₹${_totalAmount.toStringAsFixed(2)}',
+                        '₹${_finalBill.toStringAsFixed(0)}',
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF1E286D),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Commission slab info
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E286D).withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Commission Slab: Service Amount ₹${_serviceAmount.toStringAsFixed(0)} '
+                      '${_serviceAmount > 1000 ? '(> ₹1000 = ₹399)' : '(<= ₹1000 = ₹199)'}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: const Color(0xFF1E286D).withOpacity(0.7),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // ── Earnings Breakdown (Technician) ──────────────────────
+            _buildCard(
+              backgroundColor: Colors.green.withOpacity(0.04),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionTitle(
+                    icon: Icons.account_balance_wallet_outlined,
+                    title: 'Your Earnings Breakdown',
+                  ),
+                  const SizedBox(height: 14),
+                  _buildBillRow('Service Amount', '₹${_serviceAmount.toStringAsFixed(0)}'),
+                  _buildBillRow('GST Deduction (to Company)', '-₹${_gstToCompany.toStringAsFixed(0)}'),
+                  _buildBillRow('Commission Deduction (to Company)', '-₹${_commissionToCompany.toStringAsFixed(0)}'),
+                  const Divider(height: 16, color: Colors.green),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Net Earning',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                      Text(
+                        '₹${_technicianEarnings.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
                         ),
                       ),
                     ],
@@ -604,86 +719,326 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
 
             const SizedBox(height: 12),
 
-            // ── Payment Details ───────────────────────────────────────
+            // ── Payment Status & Collection ────────────────────────────
             _buildCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildSectionTitle(
                     icon: Icons.payment_outlined,
-                    title: 'Payment Details',
+                    title: 'Payment Collection',
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Payment Mode',
-                    style: TextStyle(fontSize: 13, color: Colors.black54),
-                  ),
-                  Row(
-                    children: [
-                      Radio<String>(
-                        value: 'Cash',
-                        groupValue: _paymentMode,
-                        activeColor: const Color(0xFF1E286D),
-                        onChanged: (v) => setState(() => _paymentMode = v!),
+
+                  // ✅ Already Paid indicator
+                  if (_isAlreadyPaid) ...[
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.green.withOpacity(0.3)),
                       ),
-                      const Text('Cash'),
-                      const SizedBox(width: 24),
-                      Radio<String>(
-                        value: 'UPI',
-                        groupValue: _paymentMode,
-                        activeColor: const Color(0xFF1E286D),
-                        onChanged: (v) => setState(() => _paymentMode = v!),
-                      ),
-                      const Text('UPI'),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: _paymentReceived
-                          ? Colors.green.withOpacity(0.09)
-                          : Colors.grey.withOpacity(0.06),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: _paymentReceived
-                            ? Colors.green.withOpacity(0.3)
-                            : Colors.grey.withOpacity(0.2),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle, color: Colors.green, size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Already Paid',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                                Text(
+                                  'Payment via ${widget.booking.paymentMethod ?? 'Online'}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.green.shade700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          _paymentReceived
-                              ? Icons.check_circle
-                              : Icons.radio_button_unchecked,
-                          color: _paymentReceived
-                              ? Colors.green
-                              : Colors.grey,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Payment Received',
+                  ] else ...[
+                    // ❌ Not Paid - Show payment options
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.warning_amber, color: Colors.orange, size: 22),
+                          SizedBox(width: 10),
+                          Text(
+                            'Payment Pending - Collect from customer',
                             style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: _paymentReceived
-                                  ? Colors.green.shade700
-                                  : Colors.black87,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Select Payment Method',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        // Cash Button
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() {
+                              _paymentMode = 'Cash';
+                              _showQRCode = false;
+                            }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              decoration: BoxDecoration(
+                                color: _paymentMode == 'Cash'
+                                    ? const Color(0xFF1E286D).withOpacity(0.1)
+                                    : Colors.grey.withOpacity(0.06),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _paymentMode == 'Cash'
+                                      ? const Color(0xFF1E286D)
+                                      : Colors.grey.withOpacity(0.3),
+                                  width: _paymentMode == 'Cash' ? 2 : 1,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.money,
+                                    color: _paymentMode == 'Cash'
+                                        ? const Color(0xFF1E286D)
+                                        : Colors.grey,
+                                    size: 28,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Pay via Cash',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: _paymentMode == 'Cash'
+                                          ? const Color(0xFF1E286D)
+                                          : Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
-                        Switch(
-                          value: _paymentReceived,
-                          activeColor: Colors.green,
-                          onChanged: (v) => setState(() => _paymentReceived = v),
+                        const SizedBox(width: 12),
+                        // UPI Button
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() {
+                              _paymentMode = 'UPI';
+                              _showQRCode = true;
+                            }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              decoration: BoxDecoration(
+                                color: _paymentMode == 'UPI'
+                                    ? const Color(0xFF1E286D).withOpacity(0.1)
+                                    : Colors.grey.withOpacity(0.06),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _paymentMode == 'UPI'
+                                      ? const Color(0xFF1E286D)
+                                      : Colors.grey.withOpacity(0.3),
+                                  width: _paymentMode == 'UPI' ? 2 : 1,
+                                ),
+                              ),
+                              child: Column(
+                                children: [
+                                  Icon(
+                                    Icons.qr_code_2,
+                                    color: _paymentMode == 'UPI'
+                                        ? const Color(0xFF1E286D)
+                                        : Colors.grey,
+                                    size: 28,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Pay via UPI',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: _paymentMode == 'UPI'
+                                          ? const Color(0xFF1E286D)
+                                          : Colors.black54,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ],
                     ),
-                  ),
+
+                    // QR Code Display for UPI (Hide once payment is confirmed)
+                    if (!(_paymentReceived) && (_showQRCode || _paymentMode == 'UPI')) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF1E286D).withOpacity(0.2)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Scan to Pay via UPI',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E286D),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            // Static QR Code Image
+                            Container(
+                              height: 250,
+                              width: 250,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.grey.shade300),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.asset(
+                                  'assets/upi_qr.jpeg',
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.qr_code_scanner, size: 80, color: Colors.grey),
+                                        const SizedBox(height: 12),
+                                        Text(
+                                          'UPI QR Code\n(Add assets/upi_qr.jpeg)',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                        ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'Amount Payable: ₹${_finalBill.toStringAsFixed(0)}',
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'Ask customer to scan this QR with any UPI app (GPay, PhonePe, Paytm). Once payment is received, mark as paid below to finish the job.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.black54,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 14),
+
+                    // Payment confirmed toggle
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _paymentReceived
+                            ? Colors.green.withOpacity(0.09)
+                            : Colors.grey.withOpacity(0.06),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: _paymentReceived
+                              ? Colors.green.withOpacity(0.3)
+                              : Colors.grey.withOpacity(0.2),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _paymentReceived
+                                ? Icons.check_circle
+                                : Icons.radio_button_unchecked,
+                            color: _paymentReceived
+                                ? Colors.green
+                                : Colors.grey,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _paymentReceived ? 'Payment Confirmed' : 'Confirm Payment Received',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: _paymentReceived
+                                    ? Colors.green.shade700
+                                    : Colors.black87,
+                              ),
+                            ),
+                          ),
+                          Switch(
+                            value: _paymentReceived,
+                            activeColor: Colors.green,
+                            onChanged: (v) => setState(() => _paymentReceived = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -746,28 +1101,6 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
               child: Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _isLoading ? null : _generateInvoice,
-                      icon: const Icon(Icons.receipt_long, size: 18),
-                      label: const Text(
-                        'Generate Invoice',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: const BorderSide(color: Color(0xFF1E286D), width: 1.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        foregroundColor: const Color(0xFF1E286D),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
                     child: ElevatedButton.icon(
                       onPressed: _isLoading ? null : _completeJob,
                       icon: _isLoading
@@ -783,16 +1116,16 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
                       label: Text(
                         _isLoading ? 'Processing...' : 'Complete Job',
                         style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         elevation: 0,
                       ),
@@ -807,6 +1140,124 @@ class _CompleteJobPageState extends State<CompleteJobPage> {
         ),
       ),
     );
+  }
+
+  void _showJobSuccessSheet() {
+    showModalBottomSheet(
+      context: context,
+      isDismissible: false,
+      enableDrag: false,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle,
+                color: Colors.green,
+                size: 64,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Job Completed Successfully!',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Job has been marked as finished. Your wallet has been updated based on the payment method.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+                height: 1.5,
+              ),
+            ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _generateInvoice(),
+                icon: const Icon(Icons.verified_outlined),
+                label: const Text(
+                  'Certificate',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E286D),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
+                child: const Text(
+                  'Back to Home',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E286D),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _generateInvoice() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final technician = authProvider.technician;
+      if (technician == null) throw Exception('Technician not found');
+
+      await PDFService.printJobCompletionCertificate(
+        booking: widget.booking,
+        technicianName: technician.name,
+        completedJobsCount: technician.completedJobs ?? 0,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error generating certificate: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   Widget _buildCard({required Widget child, Color? backgroundColor}) {

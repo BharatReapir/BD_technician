@@ -426,17 +426,6 @@ class FirebaseService {
       
       final techData = Map<String, dynamic>.from(techSnapshot.value as Map);
       final technicianName = techData['name'] ?? 'Unknown';
-      final currentWallet = _toDouble(techData['walletBalance']);
-      
-      // Check if technician has enough balance using GST-compliant system
-      if (!PricingCalculator.canAcceptBooking(currentWallet)) {
-        throw Exception('Insufficient wallet balance. Need ₹${PricingCalculator.FIXED_COMMISSION.toStringAsFixed(0)} to accept job.');
-      }
-      
-      // Calculate new wallet balance
-      final newWalletBalance = currentWallet - PricingCalculator.FIXED_COMMISSION;
-      
-      debugPrint('💰 Wallet: ₹$currentWallet → ₹$newWalletBalance (Fee: ₹${PricingCalculator.FIXED_COMMISSION})');
       
       // Try to update booking status
       try {
@@ -451,32 +440,16 @@ class FirebaseService {
         debugPrint('✅ Booking updated successfully');
       } catch (updateError) {
         debugPrint('⚠️ Booking update failed (permission issue): $updateError');
-        // Continue anyway - the job flow can still work
       }
       
-      // Deduct wallet balance and update technician status
+      // Update technician status to busy (No wallet deduction here, happens at completion)
       await _realtimeDb.ref('technicians/$technicianId').update({
         'busy': true,
         'currentBooking': bookingId,
-        'walletBalance': newWalletBalance,
         'updatedAt': DateTime.now().toIso8601String(),
       });
       
-      // Log the wallet transaction
-      await _realtimeDb.ref('wallet_transactions').push().set({
-        'technicianId': technicianId,
-        'bookingId': bookingId,
-        'type': 'job_acceptance_fee',
-        'amount': -PricingCalculator.FIXED_COMMISSION,
-        'previousBalance': currentWallet,
-        'newBalance': newWalletBalance,
-        'description': 'Job acceptance fee for booking $bookingId',
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-        'createdAt': DateTime.now().toIso8601String(),
-      });
-      
       debugPrint('✅ Booking accepted successfully by $technicianName');
-      debugPrint('💰 ₹${PricingCalculator.FIXED_COMMISSION} deducted from wallet');
     } catch (e) {
       debugPrint('❌ Error accepting booking: $e');
       rethrow;
@@ -861,6 +834,129 @@ class FirebaseService {
       rethrow;
     }
   }
+
+  /// 💰 Update payment status and method (Cash/UPI) — called by technician
+  static Future<void> updatePaymentStatus({
+    required String bookingId,
+    required String paymentStatus,
+    required String paymentMethod,
+  }) async {
+    try {
+      await _realtimeDb.ref('bookings/$bookingId').update({
+        'paymentStatus': paymentStatus,
+        'paymentMethod': paymentMethod,
+        'paymentCollectedAt': DateTime.now().millisecondsSinceEpoch,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      debugPrint('✅ Payment status updated: $bookingId → $paymentStatus ($paymentMethod)');
+    } catch (e) {
+      debugPrint('❌ Error updating payment status: $e');
+      rethrow;
+    }
+  }
+
+  /// Credit technician earnings to wallet after job completion
+  /// Rule: Technician Net Earning = Final Bill - GST - Commission
+  ///       = Service Amount - Commission
+  /// Commission is based on Service Amount only (not Final Bill)
+  /// GST goes to company account
+  static Future<void> creditTechnicianEarnings({
+    required String technicianId,
+    required String bookingId,
+    required double serviceAmount,
+    required double earnings,
+    required double gstAmount,
+    required double commission,
+    double finalBill = 0.0,
+    double visitingCharge = 0.0,
+    String? paymentMethod,
+  }) async {
+    try {
+      final bool isCash = paymentMethod?.toLowerCase() == 'cash';
+      
+      debugPrint('💰 Processing earnings for technician $technicianId (Method: $paymentMethod)');
+      debugPrint('   Service Amount: Rs.$serviceAmount | Final Bill: Rs.$finalBill');
+      debugPrint('   GST: Rs.$gstAmount | Commission: Rs.$commission | Net Earnings: Rs.$earnings');
+
+      // Get current wallet balance
+      final balanceSnapshot = await _realtimeDb
+          .ref('technicians/$technicianId/walletBalance')
+          .get();
+      
+      final currentBalance = balanceSnapshot.exists 
+          ? (balanceSnapshot.value as num).toDouble() 
+          : 0.0;
+      
+      double walletImpact = 0.0;
+      String transType = '';
+      String transDescription = '';
+
+      if (isCash) {
+        // CASE 1: CASH
+        // Tech gets full Final Bill from customer in hand.
+        // Tech owes Company: GST + Commission.
+        // Action: DEDUCT (GST + Commission) from wallet.
+        walletImpact = -(gstAmount + commission);
+        transType = 'debit';
+        transDescription = 'Cash Job Fee: Commission Rs.${commission.toStringAsFixed(0)} + GST Rs.${gstAmount.toStringAsFixed(0)}';
+      } else {
+        // CASE 2: UPI / ONLINE
+        // Company gets full Final Bill.
+        // Tech is owed: Net Earnings (Service Amount - Commission).
+        // Action: CREDIT (Net Earnings) to wallet.
+        walletImpact = earnings;
+        transType = 'credit';
+        transDescription = 'Earnings: Service Rs.${serviceAmount.toStringAsFixed(0)} - Commission Rs.${commission.toStringAsFixed(0)}';
+      }
+
+      final newBalance = currentBalance + walletImpact;
+      
+      // Update wallet balance
+      await _realtimeDb.ref('technicians/$technicianId').update({
+        'walletBalance': newBalance,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+
+      // Log transaction
+      await _realtimeDb.ref('wallet_transactions').push().set({
+        'technicianId': technicianId,
+        'bookingId': bookingId,
+        'type': transType,
+        'paymentMethod': paymentMethod,
+        'amount': walletImpact,
+        'description': transDescription,
+        'balanceAfter': newBalance,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'serviceAmount': serviceAmount,
+        'finalBill': finalBill,
+        'gstDeducted': gstAmount,
+        'commissionDeducted': commission,
+        'visitingCharge': visitingCharge,
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+
+      // Log to company ledger
+      await _realtimeDb.ref('company_ledger').push().set({
+        'type': 'job_settlement',
+        'subType': isCash ? 'cash_deduction' : 'upi_credit',
+        'bookingId': bookingId,
+        'technicianId': technicianId,
+        'serviceAmount': serviceAmount,
+        'finalBill': finalBill,
+        'gstAmount': gstAmount,
+        'commissionAmount': commission,
+        'totalCompanyEarning': gstAmount + commission,
+        'paymentMethod': paymentMethod,
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      });
+
+      debugPrint('✅ Wallet updated. Change: Rs.${walletImpact.toStringAsFixed(0)}. New balance: Rs.${newBalance.toStringAsFixed(0)}');
+    } catch (e) {
+      debugPrint('❌ Error updating technician wallet: $e');
+      rethrow;
+    }
+  }
+
 
   /// Update booking with Razorpay order details and breakdown
   static Future<void> updateBookingOrderDetails({

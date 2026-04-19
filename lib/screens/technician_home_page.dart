@@ -1284,7 +1284,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
     BookingModel booking,
   ) {
     final calculatedEarnings = CommissionCalculator.getTechnicianEarnings(
-      booking.totalAmount,
+      booking.serviceCharge,
     );
 
     // Determine status color and text
@@ -1362,7 +1362,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '?${booking.totalAmount.toStringAsFixed(0)}',
+                    '₹${booking.totalAmount.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -1583,7 +1583,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '?${booking.totalAmount.toStringAsFixed(0)}',
+                      '₹${booking.totalAmount.toStringAsFixed(0)}',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -1940,7 +1940,7 @@ class _TechnicianHomePageState extends State<TechnicianHomePage> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              '?${CommissionCalculator.getTechnicianEarnings(booking.totalAmount).toStringAsFixed(0)}',
+                              '₹${CommissionCalculator.getTechnicianEarnings(booking.serviceCharge).toStringAsFixed(0)}',
                               style: const TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,

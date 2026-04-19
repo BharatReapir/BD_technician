@@ -81,8 +81,6 @@ class WalletService {
   Stream<List<WalletTransaction>> getTransactionHistory(String technicianId) {
     return _realtimeDb
         .ref('wallet_transactions')
-        .orderByChild('technicianId')
-        .equalTo(technicianId)
         .onValue
         .map((event) {
       final List<WalletTransaction> transactions = [];
@@ -91,7 +89,7 @@ class WalletService {
         final data = event.snapshot.value as Map<dynamic, dynamic>;
         
         data.forEach((key, value) {
-          if (value is Map) {
+          if (value is Map && value['technicianId'] == technicianId) {
             try {
               final transaction = WalletTransaction.fromJson(
                 Map<String, dynamic>.from({...value as Map, 'id': key})

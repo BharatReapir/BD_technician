@@ -16,6 +16,7 @@ class BillingModel {
   final double balancePayable;
   final String technicianName;
   final String bookingId;
+  final String? paymentMethod;
 
   BillingModel({
     required this.invoiceNumber,
@@ -35,6 +36,7 @@ class BillingModel {
     required this.balancePayable,
     required this.technicianName,
     required this.bookingId,
+    this.paymentMethod,
   });
 
   Map<String, dynamic> toJson() {
@@ -56,6 +58,7 @@ class BillingModel {
       'balancePayable': balancePayable,
       'technicianName': technicianName,
       'bookingId': bookingId,
+      'paymentMethod': paymentMethod,
     };
   }
 
@@ -78,6 +81,7 @@ class BillingModel {
       balancePayable: (json['balancePayable'] ?? 0).toDouble(),
       technicianName: json['technicianName'] ?? '',
       bookingId: json['bookingId'] ?? '',
+      paymentMethod: json['paymentMethod']?.toString(),
     );
   }
 
@@ -99,6 +103,7 @@ class BillingModel {
     double? balancePayable,
     String? technicianName,
     String? bookingId,
+    String? paymentMethod,
   }) {
     return BillingModel(
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
@@ -118,13 +123,20 @@ class BillingModel {
       balancePayable: balancePayable ?? this.balancePayable,
       technicianName: technicianName ?? this.technicianName,
       bookingId: bookingId ?? this.bookingId,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
     );
   }
 }
 
 class PricingCalculator {
-  // Fixed commission per booking (199-399)
+  // Commission slab values
+  static const double COMMISSION_LOW = 199.0;
+  static const double COMMISSION_HIGH = 399.0;
+  // For backward compat: minimum commission (used in wallet check)
   static const double FIXED_COMMISSION = 199.0;
+  
+  // Commission threshold: Service Amount > 1000 => 399, else 199
+  static const double COMMISSION_THRESHOLD = 1000.0;
   
   // Visiting charges (area-wise)
   static const double VISITING_CHARGE_STANDARD = 299.0;
@@ -135,10 +147,21 @@ class PricingCalculator {
   static const double CGST_RATE = 0.09; // 9%
   static const double SGST_RATE = 0.09; // 9%
 
+  /// Get commission based on SERVICE AMOUNT only (Rule #4, #11)
+  /// Commission sirf Service Amount par lagega, Final Bill nahi
+  /// - ₹0 to ₹1000 Service Amount = ₹199 Commission
+  /// - ₹1001 or above Service Amount = ₹399 Commission
+  static double getCommission(double serviceAmount) {
+    if (serviceAmount <= 0) return 0.0;
+    return serviceAmount > COMMISSION_THRESHOLD
+        ? COMMISSION_HIGH
+        : COMMISSION_LOW;
+  }
+
   /// Calculate visiting charge based on area/pincode
   static double getVisitingCharge(String pincode) {
     // Premium areas (can be configured based on pincode)
-    final premiumAreas = ['110001', '400001', '560001', '600001']; // Example premium pincodes
+    final premiumAreas = ['110001', '400001', '560001', '600001'];
     
     if (premiumAreas.contains(pincode)) {
       return VISITING_CHARGE_PREMIUM;
@@ -147,6 +170,9 @@ class PricingCalculator {
   }
 
   /// Calculate complete billing breakdown
+  /// Rule: GST is on Service Amount only
+  /// Rule: Final Customer Bill = Service Amount + GST
+  /// Rule: Visiting charge is adjusted when service is completed
   static BillingModel calculateBilling({
     required String customerName,
     required String serviceAddress,
@@ -156,28 +182,28 @@ class PricingCalculator {
     required double coinDiscount,
     required String technicianName,
     required String bookingId,
+    bool isServiceComplete = true,
   }) {
     // Get visiting charge based on area
     final visitingCharge = getVisitingCharge(pincode);
     
-    // Calculate final service charges (service + visiting charge)
-    final finalServiceCharges = servicePrice + visitingCharge;
+    // Net taxable value = Service Amount - Coin Discount
+    // Rule: GST is on service amount, not on visiting charge
+    final netTaxableValue = servicePrice - coinDiscount;
     
-    // Apply coin discount
-    final netTaxableValue = finalServiceCharges - coinDiscount;
-    
-    // Calculate GST
+    // Calculate GST on service amount only
     final cgstAmount = netTaxableValue * CGST_RATE;
     final sgstAmount = netTaxableValue * SGST_RATE;
     final totalGst = cgstAmount + sgstAmount;
     
-    // Calculate gross service value
+    // Gross service value = Service Amount + GST
     final grossServiceValue = netTaxableValue + totalGst;
     
-    // Visiting charge is already paid at booking time, so it's adjusted
-    final visitingChargePaid = visitingCharge;
+    // When service complete, visiting charge gets adjusted into final bill
+    // Customer se main service amount hi charge hoga
+    final visitingChargePaid = isServiceComplete ? visitingCharge : 0.0;
     
-    // Balance payable (gross value minus visiting charge already paid)
+    // Balance payable = Gross value - Visiting Charge already paid
     final balancePayable = grossServiceValue - visitingChargePaid;
     
     // Generate invoice number
@@ -189,7 +215,7 @@ class PricingCalculator {
       customerName: customerName,
       serviceAddress: serviceAddress,
       serviceName: serviceName,
-      servicePrice: finalServiceCharges,
+      servicePrice: servicePrice,
       visitingCharge: visitingCharge,
       coinDiscount: coinDiscount,
       netTaxableValue: netTaxableValue,
@@ -198,30 +224,35 @@ class PricingCalculator {
       totalGst: totalGst,
       grossServiceValue: grossServiceValue,
       visitingChargePaid: visitingChargePaid,
-      balancePayable: balancePayable,
+      balancePayable: balancePayable < 0 ? 0 : balancePayable,
       technicianName: technicianName,
       bookingId: bookingId,
     );
   }
 
-  /// Calculate technician payout
-  static double calculateTechnicianPayout(double servicePrice, double visitingCharge) {
-    // Technician gets: Service Price (excluding GST and visiting charge) - Fixed Commission
-    // Visiting charge is retained by company
-    final technicianEarnings = servicePrice - FIXED_COMMISSION;
+  /// Calculate technician payout from SERVICE AMOUNT
+  /// Rule: Technician Net Earning = Final Bill - GST - Commission
+  ///       = (Service Amount + GST) - GST - Commission
+  ///       = Service Amount - Commission
+  static double calculateTechnicianPayout(double serviceAmount) {
+    final commission = getCommission(serviceAmount);
+    final technicianEarnings = serviceAmount - commission;
     return technicianEarnings > 0 ? technicianEarnings : 0;
   }
 
   /// Calculate booking total at time of booking (for customer payment)
+  /// GST is on service price only; visiting charge is separate
   static Map<String, double> calculateBookingTotal({
     required double servicePrice,
     required String pincode,
     required double coinDiscount,
   }) {
     final visitingCharge = getVisitingCharge(pincode);
-    final taxableValue = servicePrice + visitingCharge - coinDiscount;
+    // GST only on service price (not visiting charge)
+    final taxableValue = servicePrice - coinDiscount;
     final gstAmount = taxableValue * GST_RATE;
-    final totalPayable = taxableValue + gstAmount;
+    // Total = Service + GST + Visiting Charge
+    final totalPayable = taxableValue + gstAmount + visitingCharge;
     
     return {
       'servicePrice': servicePrice,
@@ -245,6 +276,7 @@ class PricingCalculator {
   }
 
   /// Check if technician can accept booking (wallet balance check)
+  /// Minimum commission is ₹199 so wallet must have at least that
   static bool canAcceptBooking(double walletBalance) {
     return walletBalance >= FIXED_COMMISSION;
   }

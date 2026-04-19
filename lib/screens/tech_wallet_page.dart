@@ -26,7 +26,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
   bool _isLoading = false;
   late Stream<double> _balanceStream;
 
-  // ⚠️ REPLACE WITH YOUR ACTUAL RAZORPAY KEY
+  // REPLACE WITH YOUR ACTUAL RAZORPAY KEY
   static const String RAZORPAY_KEY = 'rzp_test_S4yQ9pfJFZGHEV';
 
   @override
@@ -37,11 +37,11 @@ class _TechWalletPageState extends State<TechWalletPage> {
     _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
     _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
 
-    // Refresh every 5 seconds — avoids rebuilding stream on every frame
+    // Refresh every 5 seconds avoids rebuilding stream on every frame
     _balanceStream = Stream.periodic(const Duration(seconds: 5))
         .asyncMap((_) => _walletService.getWalletBalance(widget.technicianId));
 
-    debugPrint('🔍 Technician ID: ${widget.technicianId}');
+    debugPrint('Technician ID: ${widget.technicianId}');
   }
 
   @override
@@ -51,10 +51,10 @@ class _TechWalletPageState extends State<TechWalletPage> {
     super.dispose();
   }
 
-  // ─── Payment Handlers ───────────────────────────────────────────────────────
+  // Payment Handlers 
 
   void _handlePaymentSuccess(PaymentSuccessResponse response) async {
-    debugPrint('✅ Payment Success');
+    debugPrint('Payment Success');
     debugPrint('Order ID: ${response.orderId}');
     debugPrint('Payment ID: ${response.paymentId}');
     debugPrint('Signature: ${response.signature}');
@@ -74,7 +74,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Wallet recharged successfully!'),
+            content: Text('Wallet recharged successfully!'),
             backgroundColor: Color(0xFF1E286D),
           ),
         );
@@ -84,7 +84,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('❌ Verification failed: $e'),
+            content: Text('Verification failed: $e'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 5),
           ),
@@ -94,7 +94,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
-    debugPrint('❌ Payment Failed: ${response.code} - ${response.message}');
+    debugPrint('Payment Failed: ${response.code} - ${response.message}');
     setState(() => _isLoading = false);
 
     if (mounted) {
@@ -148,14 +148,14 @@ class _TechWalletPageState extends State<TechWalletPage> {
       final totalAmount = rechargeCalculation['totalAmount']!;
       final gstAmount = rechargeCalculation['gstAmount']!;
 
-      debugPrint('💰 Amount: ₹$amount | GST: ₹$gstAmount | Total: ₹$totalAmount');
+      debugPrint('Amount: Rs $amount | GST: Rs $gstAmount | Total: Rs $totalAmount');
 
       final orderData = await TechPaymentService.createWalletRechargeOrder(
         technicianId: widget.technicianId,
         amount: totalAmount,
       );
 
-      debugPrint('📥 Order data: $orderData');
+      debugPrint('Order data: $orderData');
 
       if (!orderData.containsKey('orderId') || orderData['orderId'] == null) {
         throw Exception('Order ID not received from server');
@@ -192,7 +192,7 @@ class _TechWalletPageState extends State<TechWalletPage> {
           setDialogState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint('❌ Error in _initiatePayment: $e');
+      debugPrint('Error in _initiatePayment: $e');
       setState(() => _isLoading = false);
       if (setDialogState != null) {
           setDialogState(() => _isLoading = false);
@@ -491,7 +491,9 @@ class _TechWalletPageState extends State<TechWalletPage> {
               ),
             ),
 
-            const SizedBox(height: 24),
+            // Earnings Summary Removed
+
+            const SizedBox(height: 20),
 
             // Transaction History
             Expanded(
@@ -648,6 +650,32 @@ class _TechWalletPageState extends State<TechWalletPage> {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _summaryRow(String label, String value, Color valueColor, {bool isBold = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: isBold ? 15 : 13,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              color: isBold ? Colors.black87 : Colors.black54,
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: isBold ? 17 : 14,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w600,
+            color: valueColor,
+          ),
         ),
       ],
     );

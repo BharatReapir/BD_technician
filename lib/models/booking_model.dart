@@ -31,6 +31,9 @@ class BookingModel {
   final int? coinsUsed;
   final double? coinDiscount;
 
+  // 💰 Payment method tracking (Cash/UPI)
+  final String? paymentMethod;
+
   BookingModel({
     required this.id,
     required this.userId,
@@ -58,15 +61,26 @@ class BookingModel {
     // ✅ NEW: Coin parameters
     this.coinsUsed,
     this.coinDiscount,
+    // 💰 Payment method
+    this.paymentMethod,
   });
 
-  double get earnings => CommissionCalculator.getTechnicianEarnings(totalAmount);
+  /// Technician earnings = Service Amount - Commission
+  /// Commission is based on serviceCharge (Service Amount), NOT totalAmount (Final Bill)
+  double get earnings => CommissionCalculator.getTechnicianEarnings(serviceCharge);
   
-  double get commission => CommissionCalculator.getCommission(totalAmount);
+  /// Commission slab based on serviceCharge only
+  double get commission => CommissionCalculator.getCommission(serviceCharge);
   
-  String get commissionText => CommissionCalculator.formatCommissionText(totalAmount);
+  String get commissionText => CommissionCalculator.formatCommissionText(serviceCharge);
   
-  String get earningsText => CommissionCalculator.formatEarningsText(totalAmount);
+  String get earningsText => CommissionCalculator.formatEarningsText(serviceCharge);
+
+  /// GST amount on service charge
+  double get gstOnService => CommissionCalculator.getGSTAmount(serviceCharge);
+
+  /// Final bill = Service Amount + GST
+  double get finalBill => CommissionCalculator.getFinalBill(serviceCharge);
 
   Map<String, dynamic> toJson() {
     return {
@@ -96,6 +110,8 @@ class BookingModel {
       // ✅ NEW: Coin fields in JSON
       'coinsUsed': coinsUsed ?? 0,
       'coinDiscount': coinDiscount ?? 0.0,
+      // 💰 Payment method
+      'paymentMethod': paymentMethod ?? 'pending',
     };
   }
 
@@ -127,6 +143,8 @@ class BookingModel {
       // ✅ NEW: Parse coin fields
       coinsUsed: json['coinsUsed'] is int ? json['coinsUsed'] : (json['coinsUsed'] != null ? int.tryParse(json['coinsUsed'].toString()) : 0),
       coinDiscount: _toDouble(json['coinDiscount']),
+      // 💰 Payment method
+      paymentMethod: json['paymentMethod']?.toString(),
     );
   }
 
@@ -193,6 +211,8 @@ class BookingModel {
     // ✅ NEW: Coin parameters in copyWith
     int? coinsUsed,
     double? coinDiscount,
+    // 💰 Payment method
+    String? paymentMethod,
   }) {
     return BookingModel(
       id: id ?? this.id,
@@ -221,6 +241,8 @@ class BookingModel {
       // ✅ NEW: Coin fields in copyWith
       coinsUsed: coinsUsed ?? this.coinsUsed,
       coinDiscount: coinDiscount ?? this.coinDiscount,
+      // 💰 Payment method
+      paymentMethod: paymentMethod ?? this.paymentMethod,
     );
   }
 }
